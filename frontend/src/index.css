@@ -1,0 +1,51 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans text-dark bg-gray-light;
+  }
+  h1 {
+    @apply text-2xl font-bold md:text-3xl;
+  }
+  h2 {
+    @apply text-xl font-bold md:text-2xl;
+  }
+  h3 {
+    @apply text-lg font-bold md:text-xl;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 font-medium rounded-md transition-colors;
+  }
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-red-700;
+  }
+  .btn-secondary {
+    @apply bg-secondary text-white hover:bg-blue-600;
+  }
+  .btn-outline {
+    @apply border border-gray-dark text-dark hover:bg-gray-medium;
+  }
+  .container-custom {
+    @apply container mx-auto px-4 md:px-6;
+  }
+  .card {
+    @apply bg-white rounded-lg shadow-md overflow-hidden;
+  }
+  .form-input {
+    @apply w-full px-3 py-2 border border-gray-medium rounded-md focus:outline-none focus:ring-2 focus:ring-primary;
+  }
+  .form-label {
+    @apply block mb-2 text-sm font-medium text-dark;
+  }
+  .form-error {
+    @apply mt-1 text-sm text-red-600;
+  }
+}
+
