@@ -6,8 +6,9 @@ const CartService = {
     return response.data
   },
 
-  addItem: async (productId, quantity) => {
-    const response = await api.post("/cart/items", { product_id: productId, quantity })
+  // Cập nhật phương thức addItem để hỗ trợ các tùy chọn sản phẩm và giá biến thể
+  addItem: async (cartData) => {
+    const response = await api.post("/cart/items", cartData)
     return response.data
   },
 

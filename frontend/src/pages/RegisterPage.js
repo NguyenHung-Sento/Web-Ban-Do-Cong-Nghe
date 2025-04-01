@@ -8,6 +8,7 @@ import * as Yup from "yup"
 import { register } from "../features/auth/authSlice"
 import Layout from "../components/layout/Layout"
 import Spinner from "../components/ui/Spinner"
+import Captcha from "../components/ui/Captcha"
 import { FiUser, FiMail, FiLock, FiPhone, FiMapPin, FiEye, FiEyeOff } from "react-icons/fi"
 
 const RegisterPage = () => {
@@ -17,8 +18,16 @@ const RegisterPage = () => {
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isCaptchaValid, setIsCaptchaValid] = useState(false)
 
-  const { isLoggedIn, isLoading, error } = useSelector((state) => state.auth)
+  const [nameError, setNameError] = useState("")
+  const [emailError, setEmailError] = useState("")
+  const [phoneError, setPhoneError] = useState("")
+  const [passwordError, setPasswordError] = useState("")
+  const [confirmPasswordError, setConfirmPasswordError] = useState("")
+  const [addressError, setAddressError] = useState("")
+
+  const { isLoggedIn, isLoading, error, registrationData } = useSelector((state) => state.auth)
 
   // Get redirect path from URL query params
   const redirect = location.search ? location.search.split("=")[1] : "/"
@@ -28,7 +37,88 @@ const RegisterPage = () => {
     if (isLoggedIn) {
       navigate(redirect)
     }
-  }, [isLoggedIn, navigate, redirect])
+
+    // If registration was successful and requires verification, redirect to verification page
+    if (registrationData && registrationData.requireVerification) {
+      navigate(`/verify-email?email=${encodeURIComponent(registrationData.email)}`)
+    }
+  }, [isLoggedIn, navigate, redirect, registrationData])
+
+  // Real-time validation functions
+  const validateName = (value) => {
+    if (!value) {
+      setNameError("Họ tên là bắt buộc")
+      return false
+    }
+    if (/\d/.test(value)) {
+      setNameError("Họ tên không được chứa số")
+      return false
+    }
+    setNameError("")
+    return true
+  }
+
+  const validateEmail = (value) => {
+    if (!value) {
+      setEmailError("Email là bắt buộc")
+      return false
+    }
+    // Validate email format with domain after @ symbol
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      setEmailError("Email không hợp lệ, phải có định dạng example@domain.com")
+      return false
+    }
+    setEmailError("")
+    return true
+  }
+
+  const validatePhone = (value) => {
+    if (!value) {
+      setPhoneError("Số điện thoại là bắt buộc")
+      return false
+    }
+    if (!/^[0-9]{10,11}$/.test(value)) {
+      setPhoneError("Số điện thoại phải có 10-11 chữ số")
+      return false
+    }
+    setPhoneError("")
+    return true
+  }
+
+  const validatePassword = (value) => {
+    if (!value) {
+      setPasswordError("Mật khẩu là bắt buộc")
+      return false
+    }
+    if (value.length < 6) {
+      setPasswordError("Mật khẩu phải có ít nhất 6 ký tự")
+      return false
+    }
+    setPasswordError("")
+    return true
+  }
+
+  const validateConfirmPassword = (value, password) => {
+    if (!value) {
+      setConfirmPasswordError("Xác nhận mật khẩu là bắt buộc")
+      return false
+    }
+    if (value !== password) {
+      setConfirmPasswordError("Mật khẩu không khớp")
+      return false
+    }
+    setConfirmPasswordError("")
+    return true
+  }
+
+  const validateAddress = (value) => {
+    if (!value) {
+      setAddressError("Địa chỉ là bắt buộc")
+      return false
+    }
+    setAddressError("")
+    return true
+  }
 
   const formik = useFormik({
     initialValues: {
@@ -52,10 +142,29 @@ const RegisterPage = () => {
       address: Yup.string().required("Địa chỉ là bắt buộc"),
     }),
     onSubmit: (values) => {
-      const { confirmPassword, ...userData } = values
-      dispatch(register(userData))
+      // Validate all fields before submitting
+      const isNameValid = validateName(values.name)
+      const isEmailValid = validateEmail(values.email)
+      const isPasswordValid = validatePassword(values.password)
+      const isConfirmPasswordValid = validateConfirmPassword(values.confirmPassword, values.password)
+      const isPhoneValid = validatePhone(values.phone)
+      const isAddressValid = validateAddress(values.address)
+
+      if (!isCaptchaValid) {
+        alert("Vui lòng xác nhận CAPTCHA")
+        return
+      }
+
+      if (isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid && isPhoneValid && isAddressValid) {
+        const { confirmPassword, ...userData } = values
+        dispatch(register(userData))
+      }
     },
   })
+
+  const handleCaptchaChange = (isValid) => {
+    setIsCaptchaValid(isValid)
+  }
 
   return (
     <Layout>
@@ -78,12 +187,19 @@ const RegisterPage = () => {
                   type="text"
                   id="name"
                   name="name"
-                  className={`form-input pl-10 ${formik.touched.name && formik.errors.name ? "border-red-500" : ""}`}
+                  className={`form-input pl-10 ${nameError ? "border-red-500" : ""}`}
                   placeholder="Nhập họ tên của bạn"
-                  {...formik.getFieldProps("name")}
+                  value={formik.values.name}
+                  onChange={(e) => {
+                    // Only allow letters and spaces
+                    const value = e.target.value.replace(/[0-9]/g, "")
+                    formik.setFieldValue("name", value)
+                    validateName(value)
+                  }}
+                  onBlur={() => validateName(formik.values.name)}
                 />
               </div>
-              {formik.touched.name && formik.errors.name && <div className="form-error">{formik.errors.name}</div>}
+              {nameError && <div className="form-error">{nameError}</div>}
             </div>
 
             <div className="mb-4">
@@ -98,12 +214,18 @@ const RegisterPage = () => {
                   type="email"
                   id="email"
                   name="email"
-                  className={`form-input pl-10 ${formik.touched.email && formik.errors.email ? "border-red-500" : ""}`}
+                  className={`form-input pl-10 ${emailError ? "border-red-500" : ""}`}
                   placeholder="Nhập email của bạn"
-                  {...formik.getFieldProps("email")}
+                  value={formik.values.email}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    formik.setFieldValue("email", value)
+                    validateEmail(value)
+                  }}
+                  onBlur={() => validateEmail(formik.values.email)}
                 />
               </div>
-              {formik.touched.email && formik.errors.email && <div className="form-error">{formik.errors.email}</div>}
+              {emailError && <div className="form-error">{emailError}</div>}
             </div>
 
             <div className="mb-4">
@@ -118,11 +240,19 @@ const RegisterPage = () => {
                   type={showPassword ? "text" : "password"}
                   id="password"
                   name="password"
-                  className={`form-input pl-10 pr-10 ${
-                    formik.touched.password && formik.errors.password ? "border-red-500" : ""
-                  }`}
+                  className={`form-input pl-10 pr-10 ${passwordError ? "border-red-500" : ""}`}
                   placeholder="Nhập mật khẩu của bạn"
-                  {...formik.getFieldProps("password")}
+                  value={formik.values.password}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    formik.setFieldValue("password", value)
+                    validatePassword(value)
+                    // Also validate confirm password if it has a value
+                    if (formik.values.confirmPassword) {
+                      validateConfirmPassword(formik.values.confirmPassword, value)
+                    }
+                  }}
+                  onBlur={() => validatePassword(formik.values.password)}
                 />
                 <button
                   type="button"
@@ -132,9 +262,7 @@ const RegisterPage = () => {
                   {showPassword ? <FiEyeOff className="text-gray-dark" /> : <FiEye className="text-gray-dark" />}
                 </button>
               </div>
-              {formik.touched.password && formik.errors.password && (
-                <div className="form-error">{formik.errors.password}</div>
-              )}
+              {passwordError && <div className="form-error">{passwordError}</div>}
             </div>
 
             <div className="mb-4">
@@ -149,11 +277,15 @@ const RegisterPage = () => {
                   type={showConfirmPassword ? "text" : "password"}
                   id="confirmPassword"
                   name="confirmPassword"
-                  className={`form-input pl-10 pr-10 ${
-                    formik.touched.confirmPassword && formik.errors.confirmPassword ? "border-red-500" : ""
-                  }`}
+                  className={`form-input pl-10 pr-10 ${confirmPasswordError ? "border-red-500" : ""}`}
                   placeholder="Xác nhận mật khẩu của bạn"
-                  {...formik.getFieldProps("confirmPassword")}
+                  value={formik.values.confirmPassword}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    formik.setFieldValue("confirmPassword", value)
+                    validateConfirmPassword(value, formik.values.password)
+                  }}
+                  onBlur={() => validateConfirmPassword(formik.values.confirmPassword, formik.values.password)}
                 />
                 <button
                   type="button"
@@ -163,9 +295,7 @@ const RegisterPage = () => {
                   {showConfirmPassword ? <FiEyeOff className="text-gray-dark" /> : <FiEye className="text-gray-dark" />}
                 </button>
               </div>
-              {formik.touched.confirmPassword && formik.errors.confirmPassword && (
-                <div className="form-error">{formik.errors.confirmPassword}</div>
-              )}
+              {confirmPasswordError && <div className="form-error">{confirmPasswordError}</div>}
             </div>
 
             <div className="mb-4">
@@ -180,15 +310,23 @@ const RegisterPage = () => {
                   type="tel"
                   id="phone"
                   name="phone"
-                  className={`form-input pl-10 ${formik.touched.phone && formik.errors.phone ? "border-red-500" : ""}`}
+                  className={`form-input pl-10 ${phoneError ? "border-red-500" : ""}`}
                   placeholder="Nhập số điện thoại của bạn"
-                  {...formik.getFieldProps("phone")}
+                  value={formik.values.phone}
+                  onChange={(e) => {
+                    // Only allow numbers
+                    const value = e.target.value.replace(/\D/g, "")
+                    formik.setFieldValue("phone", value)
+                    validatePhone(value)
+                  }}
+                  onBlur={() => validatePhone(formik.values.phone)}
+                  maxLength={11}
                 />
               </div>
-              {formik.touched.phone && formik.errors.phone && <div className="form-error">{formik.errors.phone}</div>}
+              {phoneError && <div className="form-error">{phoneError}</div>}
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4">
               <label htmlFor="address" className="form-label">
                 Địa chỉ
               </label>
@@ -200,22 +338,29 @@ const RegisterPage = () => {
                   type="text"
                   id="address"
                   name="address"
-                  className={`form-input pl-10 ${
-                    formik.touched.address && formik.errors.address ? "border-red-500" : ""
-                  }`}
+                  className={`form-input pl-10 ${addressError ? "border-red-500" : ""}`}
                   placeholder="Nhập địa chỉ của bạn"
-                  {...formik.getFieldProps("address")}
+                  value={formik.values.address}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    formik.setFieldValue("address", value)
+                    validateAddress(value)
+                  }}
+                  onBlur={() => validateAddress(formik.values.address)}
                 />
               </div>
-              {formik.touched.address && formik.errors.address && (
-                <div className="form-error">{formik.errors.address}</div>
-              )}
+              {addressError && <div className="form-error">{addressError}</div>}
+            </div>
+
+            <div className="mb-6">
+              <label className="form-label">Xác nhận CAPTCHA</label>
+              <Captcha onChange={handleCaptchaChange} />
             </div>
 
             <button
               type="submit"
               className="btn btn-primary w-full flex items-center justify-center"
-              disabled={isLoading}
+              disabled={isLoading || !isCaptchaValid}
             >
               {isLoading ? <Spinner size="sm" /> : "Đăng ký"}
             </button>

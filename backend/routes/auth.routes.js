@@ -7,6 +7,8 @@ const { validate, registerRules, loginRules } = require("../middleware/validator
 // Public routes
 router.post("/register", registerRules, validate, authController.register)
 router.post("/login", loginRules, validate, authController.login)
+router.post("/verify-email", authController.verifyEmail)
+router.post("/resend-otp", authController.resendOtp)
 
 // Protected routes
 router.get("/profile", authenticate, authController.getProfile)

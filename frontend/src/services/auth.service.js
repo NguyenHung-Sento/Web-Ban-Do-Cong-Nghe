@@ -39,6 +39,17 @@ const AuthService = {
     const response = await api.put("/auth/change-password", passwordData)
     return response.data
   },
+
+  // New methods for email verification
+  verifyEmail: async (email, otp) => {
+    const response = await api.post("/auth/verify-email", { email, otp })
+    return response.data
+  },
+
+  resendOtp: async (email) => {
+    const response = await api.post("/auth/resend-otp", { email })
+    return response.data
+  },
 }
 
 export default AuthService

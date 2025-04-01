@@ -7,13 +7,6 @@ exports.getAllCategories = async (req, res, next) => {
   try {
     const categories = await Category.findAll()
 
-    // Thêm URL đầy đủ cho hình ảnh
-    categories.forEach((category) => {
-      if (category.image) {
-        category.image = `${req.protocol}://${req.get("host")}/uploads/${category.image}`
-      }
-    })
-
     res.json({
       status: "success",
       data: {
@@ -37,10 +30,6 @@ exports.getCategoryById = async (req, res, next) => {
       })
     }
 
-    // Thêm URL đầy đủ cho hình ảnh
-    if (category.image) {
-      category.image = `${req.protocol}://${req.get("host")}/uploads/${category.image}`
-    }
 
     res.json({
       status: "success",
@@ -65,10 +54,6 @@ exports.getCategoryBySlug = async (req, res, next) => {
       })
     }
 
-    // Thêm URL đầy đủ cho hình ảnh
-    if (category.image) {
-      category.image = `${req.protocol}://${req.get("host")}/uploads/${category.image}`
-    }
 
     res.json({
       status: "success",

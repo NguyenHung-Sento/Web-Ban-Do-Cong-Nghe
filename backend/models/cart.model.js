@@ -31,7 +31,7 @@ const Cart = {
     }
   },
 
-  addItem: async (userId, productId, quantity) => {
+  addItem: async (userId, productId, quantity, options = null) => {
     // Get cart or create if not exists
     const [cartRows] = await db.query(`SELECT * FROM carts WHERE user_id = ?`, [userId])
 
@@ -45,27 +45,38 @@ const Cart = {
       cartId = cartRows[0].id
     }
 
-    // Check if product already in cart
-    const [existingItems] = await db.query(`SELECT * FROM cart_items WHERE cart_id = ? AND product_id = ?`, [
-      cartId,
-      productId,
-    ])
+    // Check if product already in cart with the same options
+    let query = `SELECT * FROM cart_items WHERE cart_id = ? AND product_id = ?`
+    const queryParams = [cartId, productId]
+
+    if (options) {
+      query += ` AND options = ?`
+      queryParams.push(JSON.stringify(options))
+    } else {
+      query += ` AND (options IS NULL OR options = '{}')`
+    }
+
+    const [existingItems] = await db.query(query, queryParams)
 
     if (existingItems.length > 0) {
       // Update quantity
       await db.query(`UPDATE cart_items SET quantity = quantity + ? WHERE id = ?`, [quantity, existingItems[0].id])
     } else {
       // Add new item
-      await db.query(`INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, ?)`, [
-        cartId,
-        productId,
-        quantity,
-      ])
+      const insertQuery = options
+        ? `INSERT INTO cart_items (cart_id, product_id, quantity, options) VALUES (?, ?, ?, ?)`
+        : `INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, ?)`
+
+      const insertParams = options
+        ? [cartId, productId, quantity, JSON.stringify(options)]
+        : [cartId, productId, quantity]
+
+      await db.query(insertQuery, insertParams)
     }
 
     return await Cart.findByUserId(userId)
   },
-
+  
   updateItem: async (userId, itemId, quantity) => {
     // Get cart
     const [cartRows] = await db.query(`SELECT * FROM carts WHERE user_id = ?`, [userId])

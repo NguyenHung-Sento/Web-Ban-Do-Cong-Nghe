@@ -16,7 +16,7 @@ const ProductCard = ({ product }) => {
     <div className="card group">
       <Link to={`/product/${product.slug}`} className="block overflow-hidden">
         <img
-          src={ "/placeholder.svg" || product.image}
+          src={product.image||"/placeholder.svg" }
           alt={product.name}
           className="w-full h-48 object-contain transition-transform duration-300 group-hover:scale-105"
         />

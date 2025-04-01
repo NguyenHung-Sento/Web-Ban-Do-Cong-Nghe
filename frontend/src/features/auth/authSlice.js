@@ -9,7 +9,7 @@ const user = JSON.parse(localStorage.getItem("user"))
 export const register = createAsyncThunk("auth/register", async (userData, { rejectWithValue }) => {
   try {
     const response = await AuthService.register(userData)
-    toast.success("Đăng ký thành công! Vui lòng đăng nhập.")
+    toast.success("Đăng ký thành công! Vui lòng xác thực email của bạn.")
     return response.data
   } catch (error) {
     const message = error.response?.data?.message || "Đăng ký thất bại"
@@ -21,9 +21,22 @@ export const register = createAsyncThunk("auth/register", async (userData, { rej
 export const login = createAsyncThunk("auth/login", async (credentials, { rejectWithValue }) => {
   try {
     const response = await AuthService.login(credentials)
+
+    // Check if account requires verification
+    if (response.data.requireVerification) {
+      toast.warning("Tài khoản chưa được xác thực. Vui lòng kiểm tra email để xác thực.")
+      return { requireVerification: true, email: response.data.email }
+    }
+
     toast.success("Đăng nhập thành công!")
     return response.data
   } catch (error) {
+    // Check if account requires verification
+    if (error.response?.data?.requireVerification) {
+      toast.warning("Tài khoản chưa được xác thực. Vui lòng kiểm tra email để xác thực.")
+      return { requireVerification: true, email: error.response.data.email }
+    }
+
     const message = error.response?.data?.message || "Đăng nhập thất bại"
     toast.error(message)
     return rejectWithValue(message)
@@ -77,10 +90,14 @@ const authSlice = createSlice({
     isLoggedIn: !!user,
     isLoading: false,
     error: null,
+    registrationData: null,
   },
   reducers: {
     resetError: (state) => {
       state.error = null
+    },
+    resetRegistrationData: (state) => {
+      state.registrationData = null
     },
   },
   extraReducers: (builder) => {
@@ -89,9 +106,11 @@ const authSlice = createSlice({
       .addCase(register.pending, (state) => {
         state.isLoading = true
         state.error = null
+        state.registrationData = null
       })
-      .addCase(register.fulfilled, (state) => {
+      .addCase(register.fulfilled, (state, action) => {
         state.isLoading = false
+        state.registrationData = action.payload
       })
       .addCase(register.rejected, (state, action) => {
         state.isLoading = false
@@ -104,8 +123,14 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false
-        state.isLoggedIn = true
-        state.user = action.payload.user
+
+        // Check if account requires verification
+        if (action.payload.requireVerification) {
+          state.registrationData = action.payload
+        } else {
+          state.isLoggedIn = true
+          state.user = action.payload.user
+        }
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false
@@ -156,7 +181,7 @@ const authSlice = createSlice({
   },
 })
 
-export const { resetError } = authSlice.actions
+export const { resetError, resetRegistrationData } = authSlice.actions
 
 export default authSlice.reducer
 

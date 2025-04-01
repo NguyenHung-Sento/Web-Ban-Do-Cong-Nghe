@@ -77,6 +77,9 @@ const Product = {
     return rows
   },
 
+  // Thêm vào các phương thức hiện có trong model
+
+  // Cập nhật phương thức findById để trả về thêm thông tin product_type và variants
   findById: async (id) => {
     const [rows] = await db.query(
       `SELECT p.*, c.name as category_name 
@@ -88,6 +91,7 @@ const Product = {
     return rows[0]
   },
 
+  // Cập nhật phương thức findBySlug tương tự
   findBySlug: async (slug) => {
     const [rows] = await db.query(
       `SELECT p.*, c.name as category_name 
@@ -97,6 +101,26 @@ const Product = {
       [slug],
     )
     return rows[0]
+  },
+
+  // Thêm phương thức để lấy sản phẩm theo loại
+  findByType: async (type, limit = 10, offset = 0) => {
+    const [rows] = await db.query(
+      `SELECT p.*, c.name as category_name 
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       WHERE p.product_type = ?
+       ORDER BY p.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [type, limit, offset],
+    )
+    return rows
+  },
+
+  // Thêm phương thức để đếm số lượng sản phẩm theo loại
+  countByType: async (type) => {
+    const [rows] = await db.query(`SELECT COUNT(*) as total FROM products WHERE product_type = ?`, [type])
+    return rows[0].total
   },
 
   create: async (productData) => {

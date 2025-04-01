@@ -41,6 +41,17 @@ const CartPage = () => {
     }
   }
 
+  // Hàm định dạng tên tùy chọn
+  const formatOptionName = (optionKey, optionValue) => {
+    const optionNames = {
+      color: "Màu sắc",
+      storage: "Dung lượng",
+      config: "Cấu hình",
+    }
+
+    return `${optionNames[optionKey] || optionKey}: ${optionValue}`
+  }
+
   if (!isLoggedIn) {
     return null
   }
@@ -86,7 +97,7 @@ const CartPage = () => {
                         <td className="py-4 px-6">
                           <div className="flex items-center">
                             <img
-                              src={ "/placeholder.svg"|| item.image}
+                              src={item.image || "/placeholder.svg"}
                               alt={item.name}
                               className="w-16 h-16 object-contain mr-4"
                             />
@@ -94,11 +105,29 @@ const CartPage = () => {
                               <Link to={`/product/${item.product_id}`} className="font-medium hover:text-primary">
                                 {item.name}
                               </Link>
+
+                              {/* Hiển thị các tùy chọn sản phẩm nếu có */}
+                              {item.options && (
+                                <div className="text-sm text-gray-dark mt-1">
+                                  {Object.entries(item.options)
+                                    .filter(([key]) => key !== "variantPrice") // Không hiển thị giá biến thể
+                                    .map(([key, value]) => (
+                                      <div key={key}>{formatOptionName(key, value)}</div>
+                                    ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </td>
                         <td className="py-4 px-6 text-center">
-                          {item.sale_price ? (
+                          {/* Sử dụng giá biến thể nếu có */}
+                          {item.options && item.options.variantPrice ? (
+                            <span className="font-medium">
+                              {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+                                item.options.variantPrice,
+                              )}
+                            </span>
+                          ) : item.sale_price ? (
                             <div>
                               <span className="font-medium text-primary">
                                 {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
@@ -140,7 +169,8 @@ const CartPage = () => {
                         </td>
                         <td className="py-4 px-6 text-center font-medium">
                           {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-                            (item.sale_price || item.price) * item.quantity,
+                            ((item.options && item.options.variantPrice) || item.sale_price || item.price) *
+                              item.quantity,
                           )}
                         </td>
                         <td className="py-4 px-6 text-center">

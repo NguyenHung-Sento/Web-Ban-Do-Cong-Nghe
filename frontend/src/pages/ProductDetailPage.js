@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useParams, Link } from "react-router-dom"
 import { useDispatch, useSelector } from "react-redux"
 import Layout from "../components/layout/Layout"
@@ -9,7 +9,7 @@ import Rating from "../components/ui/Rating"
 import ProductSlider from "../components/ui/ProductSlider"
 import { fetchProductBySlug, fetchRelatedProducts } from "../features/products/productSlice"
 import { addToCart } from "../features/cart/cartSlice"
-import { FiMinus, FiPlus, FiShoppingCart, FiHeart, FiShare2 } from "react-icons/fi"
+import { FiMinus, FiPlus, FiShoppingCart, FiHeart, FiShare2, FiAlertCircle } from "react-icons/fi"
 
 const ProductDetailPage = () => {
   const { slug } = useParams()
@@ -21,6 +21,11 @@ const ProductDetailPage = () => {
   const [activeTab, setActiveTab] = useState("description")
   const [activeImage, setActiveImage] = useState(0)
 
+  // Thêm state cho các tùy chọn sản phẩm
+  const [selectedColor, setSelectedColor] = useState("")
+  const [selectedStorage, setSelectedStorage] = useState("")
+  const [selectedConfig, setSelectedConfig] = useState("")
+
   useEffect(() => {
     dispatch(fetchProductBySlug(slug))
   }, [dispatch, slug])
@@ -28,18 +33,133 @@ const ProductDetailPage = () => {
   useEffect(() => {
     if (product) {
       dispatch(fetchRelatedProducts({ productId: product.id }))
+
+      // Khởi tạo giá trị mặc định cho các tùy chọn
+      if (product.variants) {
+        const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
+
+        if (variants.colors && variants.colors.length > 0) {
+          setSelectedColor(variants.colors[0].value)
+        }
+
+        if (variants.storage && variants.storage.length > 0) {
+          setSelectedStorage(variants.storage[0].value)
+        }
+
+        if (variants.configs && variants.configs.length > 0) {
+          setSelectedConfig(variants.configs[0].value)
+        }
+      }
     }
   }, [dispatch, product])
 
+  // Tính toán giá và tồn kho dựa trên các tùy chọn đã chọn
+  const { currentPrice, currentStock, currentImage } = useMemo(() => {
+    if (!product || !product.variants) {
+      return {
+        currentPrice: product?.sale_price || product?.price,
+        currentStock: product?.stock,
+        currentImage: product?.image,
+      }
+    }
+
+    const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
+
+    // Xử lý cho sản phẩm điện thoại (có màu sắc và dung lượng)
+    if (product.product_type === "phone") {
+      // Tìm giá dựa trên dung lượng đã chọn
+      let variantPrice = product.sale_price || product.price
+      if (variants.storage) {
+        const selectedStorageOption = variants.storage.find((s) => s.value === selectedStorage)
+        if (selectedStorageOption && selectedStorageOption.price) {
+          variantPrice = selectedStorageOption.price
+        }
+      }
+
+      // Tìm hình ảnh dựa trên màu sắc đã chọn
+      let variantImage = product.image
+      if (variants.colors) {
+        const selectedColorOption = variants.colors.find((c) => c.value === selectedColor)
+        if (selectedColorOption && selectedColorOption.image) {
+          variantImage = selectedColorOption.image
+        }
+      }
+
+      // Tìm tồn kho dựa trên kết hợp màu sắc và dung lượng
+      let variantStock = product.stock
+      if (variants.combinations) {
+        const combination = variants.combinations.find(
+          (c) => c.color === selectedColor && c.storage === selectedStorage,
+        )
+        if (combination) {
+          variantStock = combination.stock
+        }
+      }
+
+      return { currentPrice: variantPrice, currentStock: variantStock, currentImage: variantImage }
+    }
+
+    // Xử lý cho sản phẩm laptop (có cấu hình)
+    else if (product.product_type === "laptop" && variants.configs) {
+      const selectedConfigOption = variants.configs.find((c) => c.value === selectedConfig)
+      if (selectedConfigOption) {
+        return {
+          currentPrice: selectedConfigOption.price || product.price,
+          currentStock: selectedConfigOption.stock || product.stock,
+          currentImage: product.image,
+        }
+      }
+    }
+
+    return {
+      currentPrice: product.sale_price || product.price,
+      currentStock: product.stock,
+      currentImage: product.image,
+    }
+  }, [product, selectedColor, selectedStorage, selectedConfig])
+
   const handleQuantityChange = (value) => {
     const newQuantity = quantity + value
-    if (newQuantity > 0 && newQuantity <= product.stock) {
+    if (newQuantity > 0 && newQuantity <= currentStock) {
       setQuantity(newQuantity)
     }
   }
 
   const handleAddToCart = () => {
-    dispatch(addToCart({ productId: product.id, quantity }))
+    // Thêm các tùy chọn vào thông tin sản phẩm khi thêm vào giỏ hàng
+    const productOptions = {}
+
+    if (selectedColor) productOptions.color = selectedColor
+    if (selectedStorage) productOptions.storage = selectedStorage
+    if (selectedConfig) productOptions.config = selectedConfig
+
+    // Thêm giá biến thể vào options để lưu trong giỏ hàng
+    productOptions.variantPrice = currentPrice
+
+    dispatch(
+      addToCart({
+        productId: product.id,
+        quantity,
+        options: Object.keys(productOptions).length > 0 ? productOptions : undefined,
+      }),
+    )
+  }
+
+  // Xử lý khi thay đổi màu sắc
+  const handleColorChange = (colorValue) => {
+    setSelectedColor(colorValue)
+
+    // Cập nhật hình ảnh hiển thị nếu có hình ảnh theo màu
+    if (product && product.variants) {
+      const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
+      if (variants.colors) {
+        const selectedColorOption = variants.colors.find((c) => c.value === colorValue)
+        if (selectedColorOption && selectedColorOption.image) {
+          // Đặt hình ảnh màu làm hình ảnh chính
+          setActiveImage(0)
+        }
+      }
+    }
   }
 
   if (isLoading) {
@@ -72,8 +192,24 @@ const ProductDetailPage = () => {
   const specifications =
     typeof product.specifications === "string" ? JSON.parse(product.specifications) : product.specifications
 
-  // Get product images
-  const productImages = product.images ? [product.image, ...product.images] : [product.image]
+  // Parse variants if it's a string
+  const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants || {}
+
+  // Get product images - sử dụng hình ảnh theo màu nếu có
+  let productImages = [product.image]
+  if (product.images) {
+    productImages = Array.isArray(product.images) ? [product.image, ...product.images] : [product.image]
+  }
+
+  // Nếu có hình ảnh theo màu, thay thế hình ảnh đầu tiên
+  if (currentImage && currentImage !== product.image) {
+    productImages[0] = currentImage
+  }
+
+  // Kiểm tra loại sản phẩm
+  const isPhone = product.product_type === "phone"
+  const isLaptop = product.product_type === "laptop"
+  const isAccessory = product.product_type === "accessory"
 
   return (
     <Layout>
@@ -84,7 +220,7 @@ const ProductDetailPage = () => {
             <div className="md:w-2/5 mb-6 md:mb-0 md:pr-8">
               <div className="mb-4">
                 <img
-                  src={"/placeholder.svg" || productImages[activeImage] }
+                  src={productImages[activeImage] || "/placeholder.svg"}
                   alt={product.name}
                   className="w-full h-80 object-contain"
                 />
@@ -118,29 +254,28 @@ const ProductDetailPage = () => {
               <div className="flex items-center mb-4">
                 <Rating value={4.5} text="(45 đánh giá)" />
                 <span className="mx-4 text-gray-dark">|</span>
-                <span className="text-green-600">Còn hàng: {product.stock}</span>
+                <span className={currentStock > 0 ? "text-green-600" : "text-red-600"}>
+                  {currentStock > 0 ? `Còn hàng: ${currentStock}` : "Hết hàng"}
+                </span>
               </div>
 
               <div className="mb-6">
-                {product.sale_price ? (
-                  <div className="flex items-center">
-                    <span className="text-3xl font-bold text-primary">
-                      {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-                        product.sale_price,
-                      )}
-                    </span>
-                    <span className="ml-3 text-lg text-gray-dark line-through">
-                      {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(product.price)}
-                    </span>
-                    <span className="ml-3 bg-primary text-white px-2 py-1 rounded-md text-sm">
-                      {Math.round(((product.price - product.sale_price) / product.price) * 100)}% giảm
-                    </span>
-                  </div>
-                ) : (
+                {/* Hiển thị giá dựa trên biến thể đã chọn */}
+                <div className="flex items-center">
                   <span className="text-3xl font-bold text-primary">
-                    {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(product.price)}
+                    {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(currentPrice)}
                   </span>
-                )}
+                  {product.price > currentPrice && (
+                    <>
+                      <span className="ml-3 text-lg text-gray-dark line-through">
+                        {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(product.price)}
+                      </span>
+                      <span className="ml-3 bg-primary text-white px-2 py-1 rounded-md text-sm">
+                        {Math.round(((product.price - currentPrice) / product.price) * 100)}% giảm
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="mb-6">
@@ -157,6 +292,134 @@ const ProductDetailPage = () => {
                 </div>
               </div>
 
+              {/* Tùy chọn màu sắc cho điện thoại */}
+              {isPhone && variants.colors && variants.colors.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-start">
+                    <span className="w-24 text-gray-dark mt-2">Màu sắc:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {variants.colors.map((color) => (
+                        <button
+                          key={color.value}
+                          onClick={() => handleColorChange(color.value)}
+                          className={`px-4 py-2 border rounded-md ${
+                            selectedColor === color.value
+                              ? "border-primary text-primary"
+                              : "border-gray-medium text-dark"
+                          }`}
+                          style={color.code ? { backgroundColor: color.code, color: "#fff" } : {}}
+                        >
+                          {color.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tùy chọn dung lượng cho điện thoại */}
+              {isPhone && variants.storage && variants.storage.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-start">
+                    <span className="w-24 text-gray-dark mt-2">Dung lượng:</span>
+                    <div className="flex flex-wrap gap-2">
+                      {variants.storage.map((storage) => {
+                        // Kiểm tra tồn kho cho kết hợp màu sắc và dung lượng này
+                        let combinationStock = product.stock
+                        let isOutOfStock = false
+
+                        if (variants.combinations) {
+                          const combination = variants.combinations.find(
+                            (c) => c.color === selectedColor && c.storage === storage.value,
+                          )
+                          if (combination) {
+                            combinationStock = combination.stock
+                            isOutOfStock = combinationStock <= 0
+                          }
+                        }
+
+                        return (
+                          <button
+                            key={storage.value}
+                            onClick={() => setSelectedStorage(storage.value)}
+                            disabled={isOutOfStock}
+                            className={`px-4 py-2 border rounded-md ${
+                              selectedStorage === storage.value
+                                ? "border-primary text-primary"
+                                : isOutOfStock
+                                  ? "border-gray-300 text-gray-300 cursor-not-allowed"
+                                  : "border-gray-medium text-dark"
+                            }`}
+                          >
+                            <div className="flex items-center">
+                              {storage.label}
+                              {storage.price && (
+                                <span className="ml-2 text-xs">
+                                  {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+                                    storage.price,
+                                  )}
+                                </span>
+                              )}
+                              {isOutOfStock && <FiAlertCircle className="ml-1 text-red-500" title="Hết hàng" />}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tùy chọn cấu hình cho laptop */}
+              {isLaptop && variants.configs && variants.configs.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-start">
+                    <span className="w-24 text-gray-dark mt-2">Cấu hình:</span>
+                    <div className="flex flex-col gap-2 w-full">
+                      {variants.configs.map((config) => {
+                        const isOutOfStock = config.stock <= 0
+
+                        return (
+                          <button
+                            key={config.value}
+                            onClick={() => setSelectedConfig(config.value)}
+                            disabled={isOutOfStock}
+                            className={`px-4 py-3 border rounded-md text-left ${
+                              selectedConfig === config.value
+                                ? "border-primary text-primary"
+                                : isOutOfStock
+                                  ? "border-gray-300 text-gray-300 cursor-not-allowed"
+                                  : "border-gray-medium text-dark"
+                            }`}
+                          >
+                            <div className="flex justify-between">
+                              <div>
+                                <div className="font-medium">{config.label}</div>
+                                <div className="text-sm text-gray-dark">{config.description}</div>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                {config.price && (
+                                  <div className="text-primary font-medium">
+                                    {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+                                      config.price,
+                                    )}
+                                  </div>
+                                )}
+                                {isOutOfStock ? (
+                                  <div className="text-red-500 text-sm">Hết hàng</div>
+                                ) : (
+                                  <div className="text-green-500 text-sm">Còn {config.stock} sản phẩm</div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="mb-6">
                 <div className="flex items-center">
                   <span className="w-24 text-gray-dark">Số lượng:</span>
@@ -171,9 +434,9 @@ const ProductDetailPage = () => {
                     <span className="px-4 py-1 border-l border-r border-gray-medium">{quantity}</span>
                     <button
                       onClick={() => handleQuantityChange(1)}
-                      disabled={quantity >= product.stock}
+                      disabled={quantity >= currentStock}
                       className={`px-3 py-1 ${
-                        quantity >= product.stock ? "text-gray-dark" : "text-dark hover:bg-gray-medium"
+                        quantity >= currentStock ? "text-gray-dark" : "text-dark hover:bg-gray-medium"
                       }`}
                     >
                       <FiPlus />
@@ -183,9 +446,13 @@ const ProductDetailPage = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 mb-6">
-                <button onClick={handleAddToCart} className="btn btn-primary flex items-center justify-center">
+                <button
+                  onClick={handleAddToCart}
+                  className="btn btn-primary flex items-center justify-center"
+                  disabled={currentStock <= 0}
+                >
                   <FiShoppingCart className="mr-2" />
-                  Thêm vào giỏ hàng
+                  {currentStock > 0 ? "Thêm vào giỏ hàng" : "Hết hàng"}
                 </button>
 
                 <button className="btn btn-outline flex items-center justify-center">

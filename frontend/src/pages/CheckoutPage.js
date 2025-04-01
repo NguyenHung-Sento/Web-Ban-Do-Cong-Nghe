@@ -56,11 +56,18 @@ const CheckoutPage = () => {
         setIsSubmitting(true)
         setError(null)
 
-        const orderItems = items.map((item) => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          price: item.sale_price || item.price,
-        }))
+        const orderItems = items.map((item) => {
+          // Sử dụng giá biến thể nếu có
+          const itemPrice =
+            item.options && item.options.variantPrice ? item.options.variantPrice : item.sale_price || item.price
+
+          return {
+            product_id: item.product_id,
+            quantity: item.quantity,
+            price: itemPrice,
+            options: item.options ? JSON.stringify(item.options) : null,
+          }
+        })
 
         const orderData = {
           shipping_address: `${values.name}, ${values.phone}, ${values.address}`,
@@ -82,6 +89,17 @@ const CheckoutPage = () => {
       }
     },
   })
+
+  // Hàm định dạng tên tùy chọn
+  const formatOptionName = (optionKey, optionValue) => {
+    const optionNames = {
+      color: "Màu sắc",
+      storage: "Dung lượng",
+      config: "Cấu hình",
+    }
+
+    return `${optionNames[optionKey] || optionKey}: ${optionValue}`
+  }
 
   if (!isLoggedIn || (items.length === 0 && !isLoading)) {
     return null
@@ -257,16 +275,32 @@ const CheckoutPage = () => {
                         </div>
                         <div className="ml-4 flex-1">
                           <h3 className="font-medium">{item.name}</h3>
+
+                          {/* Hiển thị các tùy chọn sản phẩm nếu có */}
+                          {item.options && (
+                            <div className="text-sm text-gray-dark mt-1">
+                              {Object.entries(item.options)
+                                .filter(([key]) => key !== "variantPrice") // Không hiển thị giá biến thể
+                                .map(([key, value]) => (
+                                  <div key={key}>{formatOptionName(key, value)}</div>
+                                ))}
+                            </div>
+                          )}
+
                           <div className="flex justify-between mt-1">
                             <span className="text-gray-dark">
                               {item.quantity} x{" "}
                               {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-                                item.sale_price || item.price,
+                                item.options && item.options.variantPrice
+                                  ? item.options.variantPrice
+                                  : item.sale_price || item.price,
                               )}
                             </span>
                             <span className="font-medium">
                               {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
-                                (item.sale_price || item.price) * item.quantity,
+                                (item.options && item.options.variantPrice
+                                  ? item.options.variantPrice
+                                  : item.sale_price || item.price) * item.quantity,
                               )}
                             </span>
                           </div>

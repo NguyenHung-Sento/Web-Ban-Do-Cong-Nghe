@@ -6,13 +6,6 @@ exports.getCart = async (req, res, next) => {
   try {
     const cart = await Cart.findByUserId(req.user.id)
 
-    // Thêm URL đầy đủ cho hình ảnh sản phẩm
-    cart.items.forEach((item) => {
-      if (item.image) {
-        item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
-      }
-    })
-
     res.json({
       status: "success",
       data: {
@@ -24,10 +17,9 @@ exports.getCart = async (req, res, next) => {
   }
 }
 
-// Thêm sản phẩm vào giỏ hàng
 exports.addItem = async (req, res, next) => {
   try {
-    const { product_id, quantity } = req.body
+    const { product_id, quantity, options } = req.body
 
     if (!product_id || !quantity || quantity < 1) {
       return res.status(400).json({
@@ -36,7 +28,7 @@ exports.addItem = async (req, res, next) => {
       })
     }
 
-    // Kiểm tra xem sản phẩm có tồn tại và có đủ số lượng không
+    // Kiểm tra xem sản phẩm có tồn tại không
     const product = await Product.findById(product_id)
 
     if (!product) {
@@ -46,21 +38,57 @@ exports.addItem = async (req, res, next) => {
       })
     }
 
-    if (product.stock < quantity) {
+    // Parse options nếu là chuỗi
+    let parsedOptions = null
+    if (options) {
+      try {
+        parsedOptions = typeof options === "string" ? JSON.parse(options) : options
+      } catch (e) {
+        return res.status(400).json({
+          status: "error",
+          message: "Định dạng tùy chọn không hợp lệ",
+        })
+      }
+    }
+
+    // Kiểm tra tồn kho dựa trên biến thể
+    let availableStock = product.stock
+
+    if (product.variants) {
+      const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
+
+      // Kiểm tra tồn kho cho sản phẩm điện thoại
+      if (product.product_type === "phone" && parsedOptions && parsedOptions.color && parsedOptions.storage) {
+        if (variants.combinations) {
+          const combination = variants.combinations.find(
+            (c) => c.color === parsedOptions.color && c.storage === parsedOptions.storage,
+          )
+          if (combination) {
+            availableStock = combination.stock
+          }
+        }
+      }
+
+      // Kiểm tra tồn kho cho sản phẩm laptop
+      else if (product.product_type === "laptop" && parsedOptions && parsedOptions.config) {
+        if (variants.configs) {
+          const config = variants.configs.find((c) => c.value === parsedOptions.config)
+          if (config && config.stock !== undefined) {
+            availableStock = config.stock
+          }
+        }
+      }
+    }
+
+    if (availableStock < quantity) {
       return res.status(400).json({
         status: "error",
         message: "Không đủ số lượng sản phẩm trong kho",
       })
     }
 
-    const cart = await Cart.addItem(req.user.id, product_id, quantity)
+    const cart = await Cart.addItem(req.user.id, product_id, quantity, parsedOptions)
 
-    // Thêm URL đầy đủ cho hình ảnh sản phẩm
-    cart.items.forEach((item) => {
-      if (item.image) {
-        item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
-      }
-    })
 
     res.json({
       status: "success",
@@ -89,13 +117,6 @@ exports.updateItem = async (req, res, next) => {
 
     const cart = await Cart.updateItem(req.user.id, itemId, quantity)
 
-    // Thêm URL đầy đủ cho hình ảnh sản phẩm
-    cart.items.forEach((item) => {
-      if (item.image) {
-        item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
-      }
-    })
-
     res.json({
       status: "success",
       message: "Cập nhật giỏ hàng thành công",
@@ -114,13 +135,6 @@ exports.removeItem = async (req, res, next) => {
     const { itemId } = req.params
 
     const cart = await Cart.removeItem(req.user.id, itemId)
-
-    // Thêm URL đầy đủ cho hình ảnh sản phẩm
-    cart.items.forEach((item) => {
-      if (item.image) {
-        item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
-      }
-    })
 
     res.json({
       status: "success",

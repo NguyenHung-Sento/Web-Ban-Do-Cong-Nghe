@@ -13,17 +13,28 @@ export const fetchCart = createAsyncThunk("cart/fetchCart", async (_, { rejectWi
   }
 })
 
-export const addToCart = createAsyncThunk("cart/addToCart", async ({ productId, quantity }, { rejectWithValue }) => {
-  try {
-    const response = await CartService.addItem(productId, quantity)
-    toast.success("Đã thêm sản phẩm vào giỏ hàng")
-    return response.data.cart
-  } catch (error) {
-    const message = error.response?.data?.message || "Không thể thêm vào giỏ hàng"
-    toast.error(message)
-    return rejectWithValue(message)
-  }
-})
+// Cập nhật action addToCart để hỗ trợ các tùy chọn sản phẩm
+export const addToCart = createAsyncThunk(
+  "cart/addToCart",
+  async ({ productId, quantity, options }, { rejectWithValue }) => {
+    try {
+      // Thêm options vào request body nếu có
+      const requestData = {
+        product_id: productId,
+        quantity,
+        ...(options && { options: JSON.stringify(options) }),
+      }
+
+      const response = await CartService.addItem(requestData)
+      toast.success("Đã thêm sản phẩm vào giỏ hàng")
+      return response.data.cart
+    } catch (error) {
+      const message = error.response?.data?.message || "Không thể thêm vào giỏ hàng"
+      toast.error(message)
+      return rejectWithValue(message)
+    }
+  },
+)
 
 export const updateCartItem = createAsyncThunk(
   "cart/updateCartItem",
@@ -63,6 +74,24 @@ export const clearCart = createAsyncThunk("cart/clearCart", async (_, { rejectWi
   }
 })
 
+// Hàm tính toán tổng tiền dựa trên giá biến thể
+const calculateCartTotals = (items) => {
+  let totalItems = 0
+  let totalAmount = 0
+
+  items.forEach((item) => {
+    totalItems += item.quantity
+
+    // Sử dụng giá biến thể nếu có
+    const itemPrice =
+      item.options && item.options.variantPrice ? item.options.variantPrice : item.sale_price || item.price
+
+    totalAmount += itemPrice * item.quantity
+  })
+
+  return { totalItems, totalAmount }
+}
+
 // Slice
 const cartSlice = createSlice({
   name: "cart",
@@ -77,18 +106,6 @@ const cartSlice = createSlice({
     resetCartError: (state) => {
       state.error = null
     },
-    calculateTotals: (state) => {
-      let totalItems = 0
-      let totalAmount = 0
-
-      state.items.forEach((item) => {
-        totalItems += item.quantity
-        totalAmount += (item.sale_price || item.price) * item.quantity
-      })
-
-      state.totalItems = totalItems
-      state.totalAmount = totalAmount
-    },
   },
   extraReducers: (builder) => {
     builder
@@ -100,11 +117,10 @@ const cartSlice = createSlice({
       .addCase(fetchCart.fulfilled, (state, action) => {
         state.isLoading = false
         state.items = action.payload.items
-        state.totalItems = action.payload.items.reduce((total, item) => total + item.quantity, 0)
-        state.totalAmount = action.payload.items.reduce(
-          (total, item) => total + (item.sale_price || item.price) * item.quantity,
-          0,
-        )
+
+        const { totalItems, totalAmount } = calculateCartTotals(action.payload.items)
+        state.totalItems = totalItems
+        state.totalAmount = totalAmount
       })
       .addCase(fetchCart.rejected, (state, action) => {
         state.isLoading = false
@@ -118,11 +134,10 @@ const cartSlice = createSlice({
       .addCase(addToCart.fulfilled, (state, action) => {
         state.isLoading = false
         state.items = action.payload.items
-        state.totalItems = action.payload.items.reduce((total, item) => total + item.quantity, 0)
-        state.totalAmount = action.payload.items.reduce(
-          (total, item) => total + (item.sale_price || item.price) * item.quantity,
-          0,
-        )
+
+        const { totalItems, totalAmount } = calculateCartTotals(action.payload.items)
+        state.totalItems = totalItems
+        state.totalAmount = totalAmount
       })
       .addCase(addToCart.rejected, (state, action) => {
         state.isLoading = false
@@ -136,11 +151,10 @@ const cartSlice = createSlice({
       .addCase(updateCartItem.fulfilled, (state, action) => {
         state.isLoading = false
         state.items = action.payload.items
-        state.totalItems = action.payload.items.reduce((total, item) => total + item.quantity, 0)
-        state.totalAmount = action.payload.items.reduce(
-          (total, item) => total + (item.sale_price || item.price) * item.quantity,
-          0,
-        )
+
+        const { totalItems, totalAmount } = calculateCartTotals(action.payload.items)
+        state.totalItems = totalItems
+        state.totalAmount = totalAmount
       })
       .addCase(updateCartItem.rejected, (state, action) => {
         state.isLoading = false
@@ -154,11 +168,10 @@ const cartSlice = createSlice({
       .addCase(removeFromCart.fulfilled, (state, action) => {
         state.isLoading = false
         state.items = action.payload.items
-        state.totalItems = action.payload.items.reduce((total, item) => total + item.quantity, 0)
-        state.totalAmount = action.payload.items.reduce(
-          (total, item) => total + (item.sale_price || item.price) * item.quantity,
-          0,
-        )
+
+        const { totalItems, totalAmount } = calculateCartTotals(action.payload.items)
+        state.totalItems = totalItems
+        state.totalAmount = totalAmount
       })
       .addCase(removeFromCart.rejected, (state, action) => {
         state.isLoading = false
@@ -182,7 +195,7 @@ const cartSlice = createSlice({
   },
 })
 
-export const { resetCartError, calculateTotals } = cartSlice.actions
+export const { resetCartError } = cartSlice.actions
 
 export default cartSlice.reducer
 

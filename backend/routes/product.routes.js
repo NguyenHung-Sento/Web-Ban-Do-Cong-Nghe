@@ -15,6 +15,9 @@ router.get("/:id", productController.getProductById)
 router.get("/:id/related", productController.getRelatedProducts)
 router.get("/slug/:slug", productController.getProductBySlug)
 
+// Thêm route mới để lấy sản phẩm theo loại
+router.get("/type/:type", productController.getProductsByType)
+
 // Protected routes (admin only)
 router.post("/", authenticate, isAdmin, upload.single("image"), productRules, validate, productController.createProduct)
 router.put(

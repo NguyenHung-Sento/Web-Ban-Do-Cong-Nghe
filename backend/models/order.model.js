@@ -33,7 +33,7 @@ const Order = {
     if (!orderRows[0]) return null
 
     const [itemRows] = await db.query(
-      `SELECT oi.*, p.name as product_name, p.image as product_image 
+      `SELECT oi.*, oi.options, p.name as product_name, p.image as product_image 
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
        WHERE oi.order_id = ?`,
@@ -63,6 +63,45 @@ const Order = {
 
         // Update product stock
         await db.query(`UPDATE products SET stock = stock - ? WHERE id = ?`, [item.quantity, item.product_id])
+
+        // Nếu có tùy chọn, cập nhật tồn kho cho biến thể
+        if (item.options) {
+          const options = typeof item.options === "string" ? JSON.parse(item.options) : item.options
+          const product = await db.query(`SELECT * FROM products WHERE id = ?`, [item.product_id])
+
+          if (product[0][0] && product[0][0].variants) {
+            const variants =
+              typeof product[0][0].variants === "string" ? JSON.parse(product[0][0].variants) : product[0][0].variants
+
+            // Cập nhật tồn kho cho điện thoại
+            if (product[0][0].product_type === "phone" && options.color && options.storage && variants.combinations) {
+              const combinationIndex = variants.combinations.findIndex(
+                (c) => c.color === options.color && c.storage === options.storage,
+              )
+
+              if (combinationIndex !== -1) {
+                variants.combinations[combinationIndex].stock -= item.quantity
+                await db.query(`UPDATE products SET variants = ? WHERE id = ?`, [
+                  JSON.stringify(variants),
+                  item.product_id,
+                ])
+              }
+            }
+
+            // Cập nhật tồn kho cho laptop
+            else if (product[0][0].product_type === "laptop" && options.config && variants.configs) {
+              const configIndex = variants.configs.findIndex((c) => c.value === options.config)
+
+              if (configIndex !== -1 && variants.configs[configIndex].stock !== undefined) {
+                variants.configs[configIndex].stock -= item.quantity
+                await db.query(`UPDATE products SET variants = ? WHERE id = ?`, [
+                  JSON.stringify(variants),
+                  item.product_id,
+                ])
+              }
+            }
+          }
+        }
       }
 
       // Commit transaction
