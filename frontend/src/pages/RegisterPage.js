@@ -5,7 +5,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom"
 import { useDispatch, useSelector } from "react-redux"
 import { useFormik } from "formik"
 import * as Yup from "yup"
-import { register } from "../features/auth/authSlice"
+import { register, resetRegistrationData } from "../features/auth/authSlice"
 import Layout from "../components/layout/Layout"
 import Spinner from "../components/ui/Spinner"
 import Captcha from "../components/ui/Captcha"
@@ -19,6 +19,7 @@ const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isCaptchaValid, setIsCaptchaValid] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [nameError, setNameError] = useState("")
   const [emailError, setEmailError] = useState("")
@@ -33,6 +34,9 @@ const RegisterPage = () => {
   const redirect = location.search ? location.search.split("=")[1] : "/"
 
   useEffect(() => {
+    // Reset registration data when component mounts
+    dispatch(resetRegistrationData())
+
     // If user is already logged in, redirect
     if (isLoggedIn) {
       navigate(redirect)
@@ -42,7 +46,7 @@ const RegisterPage = () => {
     if (registrationData && registrationData.requireVerification) {
       navigate(`/verify-email?email=${encodeURIComponent(registrationData.email)}`)
     }
-  }, [isLoggedIn, navigate, redirect, registrationData])
+  }, [isLoggedIn, navigate, redirect, registrationData, dispatch])
 
   // Real-time validation functions
   const validateName = (value) => {
@@ -156,8 +160,13 @@ const RegisterPage = () => {
       }
 
       if (isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid && isPhoneValid && isAddressValid) {
+        setIsSubmitting(true)
         const { confirmPassword, ...userData } = values
         dispatch(register(userData))
+          .unwrap()
+          .catch(() => {
+            setIsSubmitting(false)
+          })
       }
     },
   })
@@ -360,9 +369,9 @@ const RegisterPage = () => {
             <button
               type="submit"
               className="btn btn-primary w-full flex items-center justify-center"
-              disabled={isLoading || !isCaptchaValid}
+              disabled={isLoading || !isCaptchaValid || isSubmitting}
             >
-              {isLoading ? <Spinner size="sm" /> : "Đăng ký"}
+              {isLoading || isSubmitting ? <Spinner size="sm" /> : "Đăng ký"}
             </button>
           </form>
 
@@ -376,6 +385,16 @@ const RegisterPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Full-page loading overlay */}
+      {isSubmitting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-5 rounded-lg flex flex-col items-center">
+            <Spinner size="lg" />
+            <p className="mt-3 text-gray-800">Đang xử lý đăng ký...</p>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

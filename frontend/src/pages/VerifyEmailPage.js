@@ -1,21 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
-import { Link } from "react-router-dom"
+import { useNavigate, useLocation, Link } from "react-router-dom"
 import Layout from "../components/layout/Layout"
 import Spinner from "../components/ui/Spinner"
 import AuthService from "../services/auth.service"
 import { toast } from "react-toastify"
-import { FiMail, FiCheck } from "react-icons/fi"
+import { FiMail, FiCheck, FiArrowLeft } from "react-icons/fi"
 
 const VerifyEmailPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
+
   const [email, setEmail] = useState("")
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
   const [isResending, setIsResending] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
   const [countdown, setCountdown] = useState(0)
@@ -26,8 +27,11 @@ const VerifyEmailPage = () => {
     const emailParam = params.get("email")
     if (emailParam) {
       setEmail(emailParam)
+    } else {
+      // If no email in URL, redirect to register page
+      navigate("/register")
     }
-  }, [location.search])
+  }, [location.search, navigate])
 
   // Handle countdown for resend button
   useEffect(() => {
@@ -94,14 +98,15 @@ const VerifyEmailPage = () => {
 
     try {
       const response = await AuthService.verifyEmail(email, otpValue)
-      setSuccess(true)
-      toast.success("Xác thực email thành công!")
 
-      // Redirect to login page after 3 seconds
-      setTimeout(() => {
-        navigate("/login")
-      }, 3000)
+      if (response.status === "success") {
+        setSuccess(true)
+        toast.success("Xác thực email thành công! Tài khoản của bạn đã được tạo.")
+      } else {
+        setError(response.message || "Xác thực không thành công. Vui lòng thử lại.")
+      }
     } catch (error) {
+      console.error("Verification error:", error)
       setError(error.response?.data?.message || "Xác thực không thành công. Vui lòng thử lại.")
     } finally {
       setIsLoading(false)
@@ -116,13 +121,37 @@ const VerifyEmailPage = () => {
     setError(null)
 
     try {
-      await AuthService.resendOtp(email)
-      toast.success("Đã gửi lại mã OTP. Vui lòng kiểm tra email của bạn.")
-      setCountdown(60) // Set 60 seconds countdown
+      const response = await AuthService.resendOtp(email)
+      if (response.status === "success") {
+        toast.success("Đã gửi lại mã OTP. Vui lòng kiểm tra email của bạn.")
+        setCountdown(60) // Set 60 seconds countdown
+      } else {
+        setError(response.message || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.")
+      }
     } catch (error) {
+      console.error("Resend OTP error:", error)
       setError(error.response?.data?.message || "Không thể gửi lại mã OTP. Vui lòng thử lại sau.")
     } finally {
       setIsResending(false)
+    }
+  }
+
+  // Handle cancel registration
+  const handleCancelRegistration = async () => {
+    if (!email) return
+
+    setIsCancelling(true)
+
+    try {
+      await AuthService.cancelRegistration(email)
+      toast.info("Đã hủy đăng ký. Vui lòng đăng ký lại.")
+      navigate("/register")
+    } catch (error) {
+      console.error("Cancel registration error:", error)
+      // Still navigate to register page even if there's an error
+      navigate("/register")
+    } finally {
+      setIsCancelling(false)
     }
   }
 
@@ -139,27 +168,48 @@ const VerifyEmailPage = () => {
               </div>
               <h1 className="text-2xl font-bold mb-4">Xác thực thành công!</h1>
               <p className="text-gray-dark mb-6">
-                Tài khoản của bạn đã được xác thực thành công. Bạn sẽ được chuyển hướng đến trang đăng nhập trong vài
-                giây.
+                Tài khoản của bạn đã được tạo thành công. Vui lòng đăng nhập để tiếp tục.
               </p>
-              <Link to="/login" className="btn btn-primary">
-                Đăng nhập ngay
-              </Link>
+              <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3 justify-center">
+                <Link to="/login" className="btn btn-primary">
+                  Đăng nhập
+                </Link>
+                <Link to="/" className="btn btn-outline">
+                  Về trang chủ
+                </Link>
+              </div>
             </div>
           ) : (
             <>
-              <div className="text-center mb-6">
-                <div className="flex justify-center mb-4">
-                  <div className="w-16 h-16 bg-primary bg-opacity-10 rounded-full flex items-center justify-center">
-                    <FiMail className="text-primary text-3xl" />
+              <div className="flex items-center mb-6">
+                <button
+                  onClick={handleCancelRegistration}
+                  disabled={isCancelling}
+                  className="flex items-center text-primary hover:underline mr-auto"
+                >
+                  {isCancelling ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    <>
+                      <FiArrowLeft className="mr-1" /> Quay lại
+                    </>
+                  )}
+                </button>
+                <div className="text-center flex-grow">
+                  <div className="flex justify-center mb-4">
+                    <div className="w-16 h-16 bg-primary bg-opacity-10 rounded-full flex items-center justify-center">
+                      <FiMail className="text-primary text-3xl" />
+                    </div>
                   </div>
+                  <h1 className="text-2xl font-bold mb-2">Xác thực email</h1>
                 </div>
-                <h1 className="text-2xl font-bold mb-2">Xác thực email</h1>
-                <p className="text-gray-dark">
-                  Chúng tôi đã gửi mã OTP đến email <span className="font-medium">{email}</span>. Vui lòng nhập mã để
-                  hoàn tất đăng ký.
-                </p>
+                <div className="invisible w-[70px]"></div> {/* Spacer for centering */}
               </div>
+
+              <p className="text-gray-dark text-center mb-4">
+                Chúng tôi đã gửi mã OTP đến email <span className="font-medium">{email}</span>. Vui lòng nhập mã để hoàn
+                tất đăng ký.
+              </p>
 
               {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>

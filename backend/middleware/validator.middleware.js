@@ -58,4 +58,3 @@ exports.cartItemRules = [
   body("product_id").isInt().withMessage("ID sản phẩm phải là số nguyên"),
   body("quantity").isInt({ min: 1 }).withMessage("Số lượng phải ít nhất là 1"),
 ]
-

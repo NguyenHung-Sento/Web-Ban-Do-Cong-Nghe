@@ -9,7 +9,7 @@ const user = JSON.parse(localStorage.getItem("user"))
 export const register = createAsyncThunk("auth/register", async (userData, { rejectWithValue }) => {
   try {
     const response = await AuthService.register(userData)
-    toast.success("Đăng ký thành công! Vui lòng xác thực email của bạn.")
+    toast.success("Vui lòng kiểm tra email để xác thực tài khoản.")
     return response.data
   } catch (error) {
     const message = error.response?.data?.message || "Đăng ký thất bại"
@@ -21,22 +21,9 @@ export const register = createAsyncThunk("auth/register", async (userData, { rej
 export const login = createAsyncThunk("auth/login", async (credentials, { rejectWithValue }) => {
   try {
     const response = await AuthService.login(credentials)
-
-    // Check if account requires verification
-    if (response.data.requireVerification) {
-      toast.warning("Tài khoản chưa được xác thực. Vui lòng kiểm tra email để xác thực.")
-      return { requireVerification: true, email: response.data.email }
-    }
-
     toast.success("Đăng nhập thành công!")
     return response.data
   } catch (error) {
-    // Check if account requires verification
-    if (error.response?.data?.requireVerification) {
-      toast.warning("Tài khoản chưa được xác thực. Vui lòng kiểm tra email để xác thực.")
-      return { requireVerification: true, email: error.response.data.email }
-    }
-
     const message = error.response?.data?.message || "Đăng nhập thất bại"
     toast.error(message)
     return rejectWithValue(message)
@@ -44,8 +31,18 @@ export const login = createAsyncThunk("auth/login", async (credentials, { reject
 })
 
 export const logout = createAsyncThunk("auth/logout", async () => {
-  AuthService.logout()
+  await AuthService.logout()
   toast.info("Đã đăng xuất")
+})
+
+export const refreshToken = createAsyncThunk("auth/refreshToken", async (_, { rejectWithValue }) => {
+  try {
+    const response = await AuthService.refreshToken()
+    return response.data
+  } catch (error) {
+    const message = error.response?.data?.message || "Không thể làm mới token"
+    return rejectWithValue(message)
+  }
 })
 
 export const getProfile = createAsyncThunk("auth/getProfile", async (_, { rejectWithValue }) => {
@@ -91,6 +88,7 @@ const authSlice = createSlice({
     isLoading: false,
     error: null,
     registrationData: null,
+    tokenRefreshing: false,
   },
   reducers: {
     resetError: (state) => {
@@ -123,14 +121,8 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false
-
-        // Check if account requires verification
-        if (action.payload.requireVerification) {
-          state.registrationData = action.payload
-        } else {
-          state.isLoggedIn = true
-          state.user = action.payload.user
-        }
+        state.isLoggedIn = true
+        state.user = action.payload.user
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false
@@ -138,6 +130,18 @@ const authSlice = createSlice({
       })
       // Logout
       .addCase(logout.fulfilled, (state) => {
+        state.isLoggedIn = false
+        state.user = null
+      })
+      // Refresh Token
+      .addCase(refreshToken.pending, (state) => {
+        state.tokenRefreshing = true
+      })
+      .addCase(refreshToken.fulfilled, (state) => {
+        state.tokenRefreshing = false
+      })
+      .addCase(refreshToken.rejected, (state) => {
+        state.tokenRefreshing = false
         state.isLoggedIn = false
         state.user = null
       })
