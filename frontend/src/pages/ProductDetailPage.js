@@ -9,13 +9,17 @@ import Rating from "../components/ui/Rating"
 import ProductSlider from "../components/ui/ProductSlider"
 import { fetchProductBySlug, fetchRelatedProducts } from "../features/products/productSlice"
 import { addToCart } from "../features/cart/cartSlice"
-import { FiMinus, FiPlus, FiShoppingCart, FiHeart, FiShare2, FiAlertCircle } from "react-icons/fi"
+import { FiMinus, FiPlus, FiShoppingCart, FiAlertCircle } from "react-icons/fi"
+import { useLoginPrompt } from "../contexts/LoginPromptContext"
+import ProductGallery from "../components/ui/ProductGallery"
 
 const ProductDetailPage = () => {
   const { slug } = useParams()
   const dispatch = useDispatch()
+  const { showLoginPrompt } = useLoginPrompt()
 
   const { product, relatedProducts, isLoading, error } = useSelector((state) => state.products)
+  const { isLoggedIn } = useSelector((state) => state.auth)
 
   const [quantity, setQuantity] = useState(1)
   const [activeTab, setActiveTab] = useState("description")
@@ -126,6 +130,24 @@ const ProductDetailPage = () => {
   }
 
   const handleAddToCart = () => {
+    if (!isLoggedIn) {
+      // Use the global login prompt
+      showLoginPrompt(`/product/${slug}`)
+      return
+    }
+
+    // Get the variant image if a color is selected
+    let variantImage = null
+    if (selectedColor && product.variants) {
+      const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
+      if (variants.colors) {
+        const selectedColorOption = variants.colors.find((c) => c.value === selectedColor)
+        if (selectedColorOption && selectedColorOption.image) {
+          variantImage = selectedColorOption.image
+        }
+      }
+    }
+
     // Thêm các tùy chọn vào thông tin sản phẩm khi thêm vào giỏ hàng
     const productOptions = {}
 
@@ -141,6 +163,7 @@ const ProductDetailPage = () => {
         productId: product.id,
         quantity,
         options: Object.keys(productOptions).length > 0 ? productOptions : undefined,
+        variantImage: variantImage,
       }),
     )
   }
@@ -149,17 +172,8 @@ const ProductDetailPage = () => {
   const handleColorChange = (colorValue) => {
     setSelectedColor(colorValue)
 
-    // Cập nhật hình ảnh hiển thị nếu có hình ảnh theo màu
-    if (product && product.variants) {
-      const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
-      if (variants.colors) {
-        const selectedColorOption = variants.colors.find((c) => c.value === colorValue)
-        if (selectedColorOption && selectedColorOption.image) {
-          // Đặt hình ảnh màu làm hình ảnh chính
-          setActiveImage(0)
-        }
-      }
-    }
+    // No need to manually set activeImage here as the ProductGallery component
+    // will handle finding and displaying the correct variant image
   }
 
   if (isLoading) {
@@ -194,17 +208,16 @@ const ProductDetailPage = () => {
 
   // Parse variants if it's a string
   const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants || {}
-
   // Get product images - sử dụng hình ảnh theo màu nếu có
-  let productImages = [product.image]
-  if (product.images) {
-    productImages = Array.isArray(product.images) ? [product.image, ...product.images] : [product.image]
-  }
+  // let productImages = [product.image]
+  // if (product.images) {
+  //   productImages = Array.isArray(product.images) ? [product.image, ...product.images] : [product.image]
+  // }
 
-  // Nếu có hình ảnh theo màu, thay thế hình ảnh đầu tiên
-  if (currentImage && currentImage !== product.image) {
-    productImages[0] = currentImage
-  }
+  // // Nếu có hình ảnh theo màu, thay thế hình ảnh đầu tiên
+  // if (currentImage && currentImage !== product.image) {
+  //   productImages[0] = currentImage
+  // }
 
   // Kiểm tra loại sản phẩm
   const isPhone = product.product_type === "phone"
@@ -218,33 +231,13 @@ const ProductDetailPage = () => {
           <div className="flex flex-col md:flex-row">
             {/* Product Images */}
             <div className="md:w-2/5 mb-6 md:mb-0 md:pr-8">
-              <div className="mb-4">
-                <img
-                  src={productImages[activeImage] || "/placeholder.svg"}
-                  alt={product.name}
-                  className="w-full h-80 object-contain"
-                />
-              </div>
-
-              {productImages.length > 1 && (
-                <div className="flex space-x-2 overflow-x-auto">
-                  {productImages.map((image, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setActiveImage(index)}
-                      className={`border-2 rounded-md p-1 ${
-                        activeImage === index ? "border-primary" : "border-gray-medium"
-                      }`}
-                    >
-                      <img
-                        src={image || "/placeholder.svg"}
-                        alt={`${product.name} - ${index + 1}`}
-                        className="w-16 h-16 object-contain"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
+              <ProductGallery
+                product={product}
+                selectedColor={selectedColor}
+                onImageChange={(image) => {
+                  // This is optional - if you need to do something when the main image changes
+                }}
+              />
             </div>
 
             {/* Product Info */}
@@ -252,7 +245,7 @@ const ProductDetailPage = () => {
               <h1 className="text-2xl font-bold mb-2">{product.name}</h1>
 
               <div className="flex items-center mb-4">
-                <Rating value={4.5} text="(45 đánh giá)" />
+                <Rating value={4.5} text={`(${product.review_count || 0} đánh giá)`} />
                 <span className="mx-4 text-gray-dark">|</span>
                 <span className={currentStock > 0 ? "text-green-600" : "text-red-600"}>
                   {currentStock > 0 ? `Còn hàng: ${currentStock}` : "Hết hàng"}
@@ -453,16 +446,6 @@ const ProductDetailPage = () => {
                 >
                   <FiShoppingCart className="mr-2" />
                   {currentStock > 0 ? "Thêm vào giỏ hàng" : "Hết hàng"}
-                </button>
-
-                <button className="btn btn-outline flex items-center justify-center">
-                  <FiHeart className="mr-2" />
-                  Thêm vào yêu thích
-                </button>
-
-                <button className="btn btn-outline flex items-center justify-center">
-                  <FiShare2 className="mr-2" />
-                  Chia sẻ
                 </button>
               </div>
             </div>

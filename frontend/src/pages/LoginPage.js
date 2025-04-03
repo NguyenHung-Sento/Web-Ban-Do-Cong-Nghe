@@ -25,7 +25,15 @@ const LoginPage = () => {
   useEffect(() => {
     // If user is already logged in, redirect
     if (isLoggedIn) {
-      navigate(redirect)
+      try {
+        // Properly decode the redirect URL
+        const decodedRedirect = decodeURIComponent(redirect)
+        navigate(decodedRedirect)
+      } catch (error) {
+        // If there's an error with the redirect URL, go to homepage
+        console.error("Error with redirect URL:", error)
+        navigate("/")
+      }
     }
   }, [isLoggedIn, navigate, redirect])
 

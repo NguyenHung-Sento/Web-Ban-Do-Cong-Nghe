@@ -13,25 +13,43 @@ export const fetchCart = createAsyncThunk("cart/fetchCart", async (_, { rejectWi
   }
 })
 
-// Cập nhật action addToCart để hỗ trợ các tùy chọn sản phẩm
+// Cập nhật action addToCart để hỗ trợ các tùy chọn sản phẩm và hình ảnh biến thể
 export const addToCart = createAsyncThunk(
   "cart/addToCart",
-  async ({ productId, quantity, options }, { rejectWithValue }) => {
+  async ({ productId, quantity, options, variantImage }, { rejectWithValue }) => {
     try {
-      // Thêm options vào request body nếu có
+      // Thêm options và variantImage vào request body nếu có
       const requestData = {
         product_id: productId,
         quantity,
         ...(options && { options: JSON.stringify(options) }),
+        ...(variantImage && { variant_image: variantImage }),
       }
+
+      console.log("Adding to cart:", requestData)
 
       const response = await CartService.addItem(requestData)
       toast.success("Đã thêm sản phẩm vào giỏ hàng")
       return response.data.cart
     } catch (error) {
-      const message = error.response?.data?.message || "Không thể thêm vào giỏ hàng"
-      toast.error(message)
-      return rejectWithValue(message)
+      console.error("Error adding to cart:", error)
+
+      // Provide more specific error messages based on the error
+      let errorMessage = "Không thể thêm vào giỏ hàng"
+
+      if (error.response) {
+        errorMessage = error.response.data?.message || errorMessage
+        console.error("Server response:", error.response.data)
+      } else if (error.request) {
+        errorMessage = "Không thể kết nối đến máy chủ. Vui lòng thử lại sau."
+        console.error("No response received:", error.request)
+      } else {
+        errorMessage = `Lỗi: ${error.message}`
+        console.error("Request error:", error.message)
+      }
+
+      toast.error(errorMessage)
+      return rejectWithValue(errorMessage)
     }
   },
 )
@@ -99,12 +117,31 @@ const cartSlice = createSlice({
     items: [],
     totalItems: 0,
     totalAmount: 0,
+    selectedItems: [], // Add state for selected items
     isLoading: false,
     error: null,
   },
   reducers: {
     resetCartError: (state) => {
       state.error = null
+    },
+    // Add reducer to handle item selection
+    toggleSelectItem: (state, action) => {
+      const itemId = action.payload
+      if (state.selectedItems.includes(itemId)) {
+        state.selectedItems = state.selectedItems.filter((id) => id !== itemId)
+      } else {
+        state.selectedItems.push(itemId)
+      }
+    },
+    // Add reducer to handle select all
+    selectAllItems: (state, action) => {
+      const allSelected = action.payload
+      if (allSelected) {
+        state.selectedItems = state.items.map((item) => item.id)
+      } else {
+        state.selectedItems = []
+      }
     },
   },
   extraReducers: (builder) => {
@@ -121,6 +158,9 @@ const cartSlice = createSlice({
         const { totalItems, totalAmount } = calculateCartTotals(action.payload.items)
         state.totalItems = totalItems
         state.totalAmount = totalAmount
+
+        // Reset selected items when cart is fetched
+        state.selectedItems = action.payload.items.map((item) => item.id)
       })
       .addCase(fetchCart.rejected, (state, action) => {
         state.isLoading = false
@@ -138,6 +178,13 @@ const cartSlice = createSlice({
         const { totalItems, totalAmount } = calculateCartTotals(action.payload.items)
         state.totalItems = totalItems
         state.totalAmount = totalAmount
+
+        // Select newly added item
+        const newItemIds = action.payload.items
+          .filter((item) => !state.items.some((existingItem) => existingItem.id === item.id))
+          .map((item) => item.id)
+
+        state.selectedItems = [...state.selectedItems, ...newItemIds]
       })
       .addCase(addToCart.rejected, (state, action) => {
         state.isLoading = false
@@ -169,6 +216,10 @@ const cartSlice = createSlice({
         state.isLoading = false
         state.items = action.payload.items
 
+        // Remove deleted item from selected items
+        const removedItemIds = state.selectedItems.filter((id) => !action.payload.items.some((item) => item.id === id))
+        state.selectedItems = state.selectedItems.filter((id) => !removedItemIds.includes(id))
+
         const { totalItems, totalAmount } = calculateCartTotals(action.payload.items)
         state.totalItems = totalItems
         state.totalAmount = totalAmount
@@ -187,6 +238,7 @@ const cartSlice = createSlice({
         state.items = []
         state.totalItems = 0
         state.totalAmount = 0
+        state.selectedItems = []
       })
       .addCase(clearCart.rejected, (state, action) => {
         state.isLoading = false
@@ -195,7 +247,7 @@ const cartSlice = createSlice({
   },
 })
 
-export const { resetCartError } = cartSlice.actions
+export const { resetCartError, toggleSelectItem, selectAllItems } = cartSlice.actions
 
 export default cartSlice.reducer
 

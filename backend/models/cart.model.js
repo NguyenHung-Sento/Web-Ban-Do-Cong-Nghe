@@ -2,20 +2,16 @@ const db = require("../config/db.config")
 
 const Cart = {
   findByUserId: async (userId) => {
-    // Get cart or create if not exists
+    // Get cart
     const [cartRows] = await db.query(`SELECT * FROM carts WHERE user_id = ?`, [userId])
 
-    let cartId
-
     if (cartRows.length === 0) {
-      // Create new cart
-      const [result] = await db.query(`INSERT INTO carts (user_id) VALUES (?)`, [userId])
-      cartId = result.insertId
-    } else {
-      cartId = cartRows[0].id
+      return { id: null, items: [], total: 0 }
     }
 
-    // Get cart items
+    const cartId = cartRows[0].id
+
+    // Get cart items with product details
     const [itemRows] = await db.query(
       `SELECT ci.*, p.name, p.price, p.sale_price, p.image, p.stock
        FROM cart_items ci
@@ -26,12 +22,14 @@ const Cart = {
 
     return {
       id: cartId,
-      user_id: userId,
       items: itemRows,
+      total: itemRows.reduce((sum, item) => sum + item.price * item.quantity, 0),
     }
   },
 
   addItem: async (userId, productId, quantity, options = null) => {
+    console.log("Cart model - Adding item:", { userId, productId, quantity, options }) // Add logging
+
     // Get cart or create if not exists
     const [cartRows] = await db.query(`SELECT * FROM carts WHERE user_id = ?`, [userId])
 
@@ -53,7 +51,7 @@ const Cart = {
       query += ` AND options = ?`
       queryParams.push(JSON.stringify(options))
     } else {
-      query += ` AND (options IS NULL OR options = '{}')`
+      query += ` AND (options IS NULL OR options = '{}' OR options = '')`
     }
 
     const [existingItems] = await db.query(query, queryParams)
@@ -74,11 +72,12 @@ const Cart = {
       await db.query(insertQuery, insertParams)
     }
 
+    // Get updated cart
     return await Cart.findByUserId(userId)
   },
-  
+
   updateItem: async (userId, itemId, quantity) => {
-    // Get cart
+    // Check if cart exists
     const [cartRows] = await db.query(`SELECT * FROM carts WHERE user_id = ?`, [userId])
 
     if (cartRows.length === 0) {
@@ -87,14 +86,22 @@ const Cart = {
 
     const cartId = cartRows[0].id
 
-    // Update item quantity
-    await db.query(`UPDATE cart_items SET quantity = ? WHERE id = ? AND cart_id = ?`, [quantity, itemId, cartId])
+    // Check if item exists and belongs to user's cart
+    const [itemRows] = await db.query(`SELECT * FROM cart_items WHERE id = ? AND cart_id = ?`, [itemId, cartId])
 
+    if (itemRows.length === 0) {
+      throw new Error("Item not found in cart")
+    }
+
+    // Update quantity
+    await db.query(`UPDATE cart_items SET quantity = ? WHERE id = ?`, [quantity, itemId])
+
+    // Return updated cart
     return await Cart.findByUserId(userId)
   },
 
   removeItem: async (userId, itemId) => {
-    // Get cart
+    // Check if cart exists
     const [cartRows] = await db.query(`SELECT * FROM carts WHERE user_id = ?`, [userId])
 
     if (cartRows.length === 0) {
@@ -103,18 +110,26 @@ const Cart = {
 
     const cartId = cartRows[0].id
 
-    // Remove item
-    await db.query(`DELETE FROM cart_items WHERE id = ? AND cart_id = ?`, [itemId, cartId])
+    // Check if item exists and belongs to user's cart
+    const [itemRows] = await db.query(`SELECT * FROM cart_items WHERE id = ? AND cart_id = ?`, [itemId, cartId])
 
+    if (itemRows.length === 0) {
+      throw new Error("Item not found in cart")
+    }
+
+    // Remove item
+    await db.query(`DELETE FROM cart_items WHERE id = ?`, [itemId])
+
+    // Return updated cart
     return await Cart.findByUserId(userId)
   },
 
   clearCart: async (userId) => {
-    // Get cart
+    // Check if cart exists
     const [cartRows] = await db.query(`SELECT * FROM carts WHERE user_id = ?`, [userId])
 
     if (cartRows.length === 0) {
-      return
+      return { id: null, items: [], total: 0 }
     }
 
     const cartId = cartRows[0].id
@@ -122,11 +137,8 @@ const Cart = {
     // Remove all items
     await db.query(`DELETE FROM cart_items WHERE cart_id = ?`, [cartId])
 
-    return {
-      id: cartId,
-      user_id: userId,
-      items: [],
-    }
+    // Return empty cart
+    return { id: cartId, items: [], total: 0 }
   },
 }
 

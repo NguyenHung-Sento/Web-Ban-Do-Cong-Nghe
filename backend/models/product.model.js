@@ -3,7 +3,8 @@ const db = require("../config/db.config")
 const Product = {
   findAll: async (limit = 10, offset = 0, filters = {}) => {
     let query = `
-      SELECT p.*, c.name as category_name 
+      SELECT p.*, c.name as category_name, 
+  (SELECT COUNT(*) FROM reviews WHERE product_id = p.id) as review_count
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE 1=1
@@ -82,10 +83,11 @@ const Product = {
   // Cập nhật phương thức findById để trả về thêm thông tin product_type và variants
   findById: async (id) => {
     const [rows] = await db.query(
-      `SELECT p.*, c.name as category_name 
-       FROM products p
-       LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.id = ?`,
+      `SELECT p.*, c.name as category_name,
+     (SELECT COUNT(*) FROM reviews WHERE product_id = p.id) as review_count
+     FROM products p
+     LEFT JOIN categories c ON p.category_id = c.id
+     WHERE p.id = ?`,
       [id],
     )
     return rows[0]
@@ -94,10 +96,11 @@ const Product = {
   // Cập nhật phương thức findBySlug tương tự
   findBySlug: async (slug) => {
     const [rows] = await db.query(
-      `SELECT p.*, c.name as category_name 
-       FROM products p
-       LEFT JOIN categories c ON p.category_id = c.id
-       WHERE p.slug = ?`,
+      `SELECT p.*, c.name as category_name,
+     (SELECT COUNT(*) FROM reviews WHERE product_id = p.id) as review_count
+     FROM products p
+     LEFT JOIN categories c ON p.category_id = c.id
+     WHERE p.slug = ?`,
       [slug],
     )
     return rows[0]

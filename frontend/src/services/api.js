@@ -66,6 +66,12 @@ api.interceptors.response.use(
       }
     }
 
+    // Don't show the default "Không có token xác thực" message for 401 errors
+    // Let the individual services handle these errors
+    if (error.response?.status === 401 && error.response?.data?.message === "Không có token xác thực") {
+      return Promise.reject(error)
+    }
+
     return Promise.reject(error)
   },
 )

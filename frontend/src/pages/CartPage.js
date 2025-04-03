@@ -1,27 +1,66 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useDispatch, useSelector } from "react-redux"
 import Layout from "../components/layout/Layout"
 import Spinner from "../components/ui/Spinner"
-import { fetchCart, updateCartItem, removeFromCart, clearCart } from "../features/cart/cartSlice"
+import {
+  fetchCart,
+  updateCartItem,
+  removeFromCart,
+  clearCart,
+  toggleSelectItem,
+  selectAllItems,
+} from "../features/cart/cartSlice"
 import { FiTrash2, FiMinus, FiPlus, FiArrowLeft, FiShoppingCart } from "react-icons/fi"
 
 const CartPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
 
-  const { items, totalItems, totalAmount, isLoading } = useSelector((state) => state.cart)
+  const { items, totalItems, totalAmount, selectedItems, isLoading } = useSelector((state) => state.cart)
   const { isLoggedIn } = useSelector((state) => state.auth)
 
+  // Calculate totals for selected items only
+  const [selectedTotals, setSelectedTotals] = useState({
+    count: 0,
+    amount: 0,
+  })
+
+  // Update selected totals when items or selection changes
+  useEffect(() => {
+    if (items.length > 0 && selectedItems.length > 0) {
+      let count = 0
+      let amount = 0
+
+      items.forEach((item) => {
+        if (selectedItems.includes(item.id)) {
+          count += item.quantity
+          const itemPrice =
+            item.options && item.options.variantPrice ? item.options.variantPrice : item.sale_price || item.price
+          amount += itemPrice * item.quantity
+        }
+      })
+
+      setSelectedTotals({
+        count,
+        amount,
+      })
+    } else {
+      setSelectedTotals({
+        count: 0,
+        amount: 0,
+      })
+    }
+  }, [items, selectedItems])
+
+  // Update the useEffect hook that checks login status
   useEffect(() => {
     if (isLoggedIn) {
       dispatch(fetchCart())
-    } else {
-      navigate("/login?redirect=cart")
     }
-  }, [dispatch, isLoggedIn, navigate])
+  }, [dispatch, isLoggedIn])
 
   const handleQuantityChange = (itemId, quantity) => {
     if (quantity >= 1) {
@@ -41,6 +80,28 @@ const CartPage = () => {
     }
   }
 
+  // Handle item selection toggle
+  const handleToggleSelect = (itemId) => {
+    dispatch(toggleSelectItem(itemId))
+  }
+
+  // Handle select all toggle
+  const handleSelectAll = (e) => {
+    dispatch(selectAllItems(e.target.checked))
+  }
+
+  // Check if all items are selected
+  const allSelected = items.length > 0 && selectedItems.length === items.length
+
+  // Proceed to checkout with selected items only
+  const handleCheckout = () => {
+    if (selectedItems.length === 0) {
+      alert("Vui lòng chọn ít nhất một sản phẩm để thanh toán")
+      return
+    }
+    navigate("/checkout")
+  }
+
   // Hàm định dạng tên tùy chọn
   const formatOptionName = (optionKey, optionValue) => {
     const optionNames = {
@@ -52,8 +113,26 @@ const CartPage = () => {
     return `${optionNames[optionKey] || optionKey}: ${optionValue}`
   }
 
+  // Replace the early return for not logged in users
   if (!isLoggedIn) {
-    return null
+    return (
+      <Layout>
+        <div className="container-custom py-8">
+          <h1 className="mb-6">Giỏ hàng của bạn</h1>
+
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <div className="flex justify-center mb-4">
+              <FiShoppingCart size={64} className="text-gray-dark" />
+            </div>
+            <h2 className="text-2xl font-bold mb-4">Vui lòng đăng nhập</h2>
+            <p className="text-gray-dark mb-6">Bạn cần đăng nhập để xem giỏ hàng của mình.</p>
+            <Link to={`/login?redirect=${encodeURIComponent("/cart")}`} className="btn btn-primary">
+              Đăng nhập
+            </Link>
+          </div>
+        </div>
+      </Layout>
+    )
   }
 
   return (
@@ -84,6 +163,11 @@ const CartPage = () => {
                 <table className="w-full">
                   <thead className="bg-gray-light">
                     <tr>
+                      <th className="py-4 px-2 text-center">
+                        <div className="flex items-center justify-center">
+                          <input type="checkbox" className="w-4 h-4" checked={allSelected} onChange={handleSelectAll} />
+                        </div>
+                      </th>
                       <th className="py-4 px-6 text-left">Sản phẩm</th>
                       <th className="py-4 px-6 text-center">Giá</th>
                       <th className="py-4 px-6 text-center">Số lượng</th>
@@ -94,6 +178,16 @@ const CartPage = () => {
                   <tbody>
                     {items.map((item) => (
                       <tr key={item.id} className="border-b border-gray-medium">
+                        <td className="py-4 px-2 text-center">
+                          <div className="flex items-center justify-center">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4"
+                              checked={selectedItems.includes(item.id)}
+                              onChange={() => handleToggleSelect(item.id)}
+                            />
+                          </div>
+                        </td>
                         <td className="py-4 px-6">
                           <div className="flex items-center">
                             <img
@@ -110,7 +204,7 @@ const CartPage = () => {
                               {item.options && (
                                 <div className="text-sm text-gray-dark mt-1">
                                   {Object.entries(item.options)
-                                    .filter(([key]) => key !== "variantPrice") // Không hiển thị giá biến thể
+                                    .filter(([key]) => !["variantPrice", "variantImage"].includes(key)) // Không hiển thị giá và ảnh biến thể
                                     .map(([key, value]) => (
                                       <div key={key}>{formatOptionName(key, value)}</div>
                                     ))}
@@ -207,14 +301,18 @@ const CartPage = () => {
 
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between">
-                    <span className="text-gray-dark">Tổng sản phẩm:</span>
-                    <span>{totalItems}</span>
+                    <span className="text-gray-dark">Sản phẩm đã chọn:</span>
+                    <span>
+                      {selectedTotals.count} / {totalItems}
+                    </span>
                   </div>
 
                   <div className="flex justify-between">
                     <span className="text-gray-dark">Tạm tính:</span>
                     <span>
-                      {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(totalAmount)}
+                      {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+                        selectedTotals.amount,
+                      )}
                     </span>
                   </div>
 
@@ -226,14 +324,26 @@ const CartPage = () => {
                   <div className="border-t border-gray-medium pt-4 flex justify-between font-bold">
                     <span>Tổng cộng:</span>
                     <span className="text-primary text-xl">
-                      {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(totalAmount)}
+                      {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+                        selectedTotals.amount,
+                      )}
                     </span>
                   </div>
                 </div>
 
-                <Link to="/checkout" className="btn btn-primary w-full">
-                  Tiến hành thanh toán
-                </Link>
+                <button
+                  onClick={handleCheckout}
+                  className="btn btn-primary w-full"
+                  disabled={selectedItems.length === 0}
+                >
+                  {selectedItems.length === 0 ? "Vui lòng chọn sản phẩm" : "Tiến hành thanh toán"}
+                </button>
+
+                {selectedItems.length === 0 && (
+                  <p className="text-sm text-red-500 mt-2 text-center">
+                    Vui lòng chọn ít nhất một sản phẩm để thanh toán
+                  </p>
+                )}
               </div>
             </div>
           </div>

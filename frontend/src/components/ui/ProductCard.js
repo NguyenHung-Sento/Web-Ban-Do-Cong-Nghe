@@ -1,14 +1,23 @@
 "use client"
 import { Link } from "react-router-dom"
-import { useDispatch } from "react-redux"
+import { useDispatch, useSelector } from "react-redux"
 import { FiShoppingCart } from "react-icons/fi"
 import { addToCart } from "../../features/cart/cartSlice"
 import Rating from "./Rating"
+import { useLoginPrompt } from "../../contexts/LoginPromptContext"
 
 const ProductCard = ({ product }) => {
   const dispatch = useDispatch()
+  const { isLoggedIn } = useSelector((state) => state.auth)
+  const { showLoginPrompt } = useLoginPrompt()
 
   const handleAddToCart = () => {
+    if (!isLoggedIn) {
+      // Use the global login prompt
+      showLoginPrompt(`/product/${product.slug}`)
+      return
+    }
+
     dispatch(addToCart({ productId: product.id, quantity: 1 }))
   }
 
@@ -16,7 +25,7 @@ const ProductCard = ({ product }) => {
     <div className="card group">
       <Link to={`/product/${product.slug}`} className="block overflow-hidden">
         <img
-          src={product.image||"/placeholder.svg" }
+          src={product.image || "/placeholder.svg"}
           alt={product.name}
           className="w-full h-48 object-contain transition-transform duration-300 group-hover:scale-105"
         />
@@ -25,7 +34,7 @@ const ProductCard = ({ product }) => {
         <Link to={`/product/${product.slug}`} className="block">
           <h3 className="text-base font-medium mb-1 line-clamp-2 h-12">{product.name}</h3>
           <div className="mb-2">
-            <Rating value={4} text={`(${Math.floor(Math.random() * 50) + 5})`} />
+            <Rating value={4} text={`(${product.review_count || 0})`} />
           </div>
           <div className="flex items-center mb-3">
             {product.sale_price ? (
