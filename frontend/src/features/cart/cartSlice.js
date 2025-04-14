@@ -26,8 +26,6 @@ export const addToCart = createAsyncThunk(
         ...(variantImage && { variant_image: variantImage }),
       }
 
-      console.log("Adding to cart:", requestData)
-
       const response = await CartService.addItem(requestData)
       toast.success("Đã thêm sản phẩm vào giỏ hàng")
       return response.data.cart

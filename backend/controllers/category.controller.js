@@ -1,6 +1,4 @@
 const Category = require("../models/category.model")
-const fs = require("fs")
-const path = require("path")
 
 // Lấy tất cả danh mục
 exports.getAllCategories = async (req, res, next) => {
@@ -30,7 +28,6 @@ exports.getCategoryById = async (req, res, next) => {
       })
     }
 
-
     res.json({
       status: "success",
       data: {
@@ -54,7 +51,6 @@ exports.getCategoryBySlug = async (req, res, next) => {
       })
     }
 
-
     res.json({
       status: "success",
       data: {
@@ -70,11 +66,6 @@ exports.getCategoryBySlug = async (req, res, next) => {
 exports.createCategory = async (req, res, next) => {
   try {
     const categoryData = { ...req.body }
-
-    // Xử lý upload file
-    if (req.file) {
-      categoryData.image = req.file.filename
-    }
 
     const categoryId = await Category.create(categoryData)
 
@@ -95,7 +86,7 @@ exports.updateCategory = async (req, res, next) => {
   try {
     const categoryData = { ...req.body }
 
-    // Lấy danh mục hiện tại để kiểm tra hình ảnh
+    // Lấy danh mục hiện tại
     const existingCategory = await Category.findById(req.params.id)
 
     if (!existingCategory) {
@@ -103,19 +94,6 @@ exports.updateCategory = async (req, res, next) => {
         status: "error",
         message: "Không tìm thấy danh mục",
       })
-    }
-
-    // Xử lý upload file
-    if (req.file) {
-      // Xóa hình ảnh cũ nếu tồn tại
-      if (existingCategory.image) {
-        const oldImagePath = path.join(__dirname, "../uploads", existingCategory.image)
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath)
-        }
-      }
-
-      categoryData.image = req.file.filename
     }
 
     const success = await Category.update(req.params.id, categoryData)
@@ -139,7 +117,7 @@ exports.updateCategory = async (req, res, next) => {
 // Xóa danh mục
 exports.deleteCategory = async (req, res, next) => {
   try {
-    // Lấy danh mục hiện tại để kiểm tra hình ảnh
+    // Lấy danh mục hiện tại
     const existingCategory = await Category.findById(req.params.id)
 
     if (!existingCategory) {
@@ -147,14 +125,6 @@ exports.deleteCategory = async (req, res, next) => {
         status: "error",
         message: "Không tìm thấy danh mục",
       })
-    }
-
-    // Xóa hình ảnh danh mục nếu tồn tại
-    if (existingCategory.image) {
-      const imagePath = path.join(__dirname, "../uploads", existingCategory.image)
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath)
-      }
     }
 
     const success = await Category.delete(req.params.id)

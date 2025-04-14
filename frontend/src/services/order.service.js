@@ -15,7 +15,12 @@ const OrderService = {
     const response = await api.post("/orders", orderData)
     return response.data
   },
+
+  // Add this new method to delete an order
+  deleteOrder: async (id) => {
+    const response = await api.delete(`/orders/${id}`)
+    return response.data
+  },
 }
 
 export default OrderService
-

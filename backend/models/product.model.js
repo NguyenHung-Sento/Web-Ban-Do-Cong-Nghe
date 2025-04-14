@@ -24,12 +24,12 @@ const Product = {
 
     if (filters.price_min) {
       query += ` AND p.price >= ?`
-      queryParams.push(filters.price_min)
+      queryParams.push(Number(filters.price_min))
     }
 
     if (filters.price_max) {
       query += ` AND p.price <= ?`
-      queryParams.push(filters.price_max)
+      queryParams.push(Number(filters.price_max))
     }
 
     if (filters.featured) {
@@ -72,7 +72,7 @@ const Product = {
     }
 
     query += ` LIMIT ? OFFSET ?`
-    queryParams.push(limit, offset)
+    queryParams.push(Number(limit), Number(offset))
 
     const [rows] = await db.query(query, queryParams)
     return rows
@@ -157,12 +157,12 @@ const Product = {
 
     if (filters.price_min) {
       query += ` AND p.price >= ?`
-      queryParams.push(filters.price_min)
+      queryParams.push(Number(filters.price_min))
     }
 
     if (filters.price_max) {
       query += ` AND p.price <= ?`
-      queryParams.push(filters.price_max)
+      queryParams.push(Number(filters.price_max))
     }
 
     if (filters.featured) {
@@ -194,6 +194,16 @@ const Product = {
       [`%${keyword}%`, `%${keyword}%`, limit, offset],
     )
     return rows
+  },
+
+  countSearch: async (keyword) => {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) as total 
+       FROM products 
+       WHERE name LIKE ? OR description LIKE ?`,
+      [`%${keyword}%`, `%${keyword}%`],
+    )
+    return rows[0].total
   },
 
   getRelatedProducts: async (productId, categoryId, limit = 4) => {
@@ -264,4 +274,3 @@ const Product = {
 }
 
 module.exports = Product
-

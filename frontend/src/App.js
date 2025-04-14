@@ -14,6 +14,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage"
 import ProfilePage from "./pages/ProfilePage"
 import OrdersPage from "./pages/OrdersPage"
 import CheckoutPage from "./pages/CheckoutPage"
+import PaymentReturnPage from "./pages/PaymentReturnPage"
 import NotFoundPage from "./pages/NotFoundPage"
 
 const App = () => {
@@ -34,6 +35,8 @@ const App = () => {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/payment/momo/return" element={<PaymentReturnPage />} />
+          <Route path="/payment/vnpay/return" element={<PaymentReturnPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
         </LoginPromptProvider>

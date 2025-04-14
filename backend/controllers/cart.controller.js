@@ -4,7 +4,6 @@ const Cart = require("../models/cart.model")
 // Cập nhật phương thức addItem để hỗ trợ các tùy chọn sản phẩm và hình ảnh biến thể
 exports.addItem = async (req, res, next) => {
   try {
-    console.log("Backend - Add to cart request:", req.body)
 
     const { product_id, quantity, options, variant_image } = req.body
 
@@ -83,21 +82,13 @@ exports.addItem = async (req, res, next) => {
       })
     }
 
-    console.log("Adding to cart with options:", parsedOptions)
-
     try {
       const cart = await Cart.addItem(req.user.id, product_id, quantity, parsedOptions)
-
-      // Thêm URL đầy đủ cho hình ảnh sản phẩm
+      
       cart.items.forEach((item) => {
         // If item has variant image in options, use that instead
         if (item.options && item.options.variantImage) {
           item.image = item.options.variantImage
-        } else if (item.image) {
-          // Otherwise use the product image
-          if (!item.image.startsWith("http")) {
-            item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
-          }
         }
       })
 
@@ -131,11 +122,6 @@ exports.getCart = async (req, res, next) => {
       // If item has variant image in options, use that instead
       if (item.options && item.options.variantImage) {
         item.image = item.options.variantImage
-      } else if (item.image) {
-        // Otherwise use the product image
-        if (!item.image.startsWith("http")) {
-          item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
-        }
       }
     })
 
@@ -164,16 +150,11 @@ exports.updateItem = async (req, res, next) => {
 
     const cart = await Cart.updateItem(req.user.id, req.params.itemId, quantity)
 
-    // Thêm URL đầy đủ cho hình ảnh sản phẩm và xử lý hình ảnh biến thể
+    // xử lý hình ảnh biến thể
     cart.items.forEach((item) => {
       // If item has variant image in options, use that instead
       if (item.options && item.options.variantImage) {
         item.image = item.options.variantImage
-      } else if (item.image) {
-        // Otherwise use the product image
-        if (!item.image.startsWith("http")) {
-          item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
-        }
       }
     })
 
@@ -194,16 +175,11 @@ exports.removeItem = async (req, res, next) => {
   try {
     const cart = await Cart.removeItem(req.user.id, req.params.itemId)
 
-    // Thêm URL đầy đủ cho hình ảnh sản phẩm và xử lý hình ảnh biến thể
+    // xử lý hình ảnh biến thể
     cart.items.forEach((item) => {
       // If item has variant image in options, use that instead
       if (item.options && item.options.variantImage) {
         item.image = item.options.variantImage
-      } else if (item.image) {
-        // Otherwise use the product image
-        if (!item.image.startsWith("http")) {
-          item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
-        }
       }
     })
 

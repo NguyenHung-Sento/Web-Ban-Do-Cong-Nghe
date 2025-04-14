@@ -11,10 +11,10 @@ router.use(authenticate)
 router.get("/", orderController.getAllOrders)
 router.get("/:id", orderController.getOrderById)
 router.post("/", orderRules, validate, orderController.createOrder)
+router.delete("/:id", orderController.deleteOrder) // Add this new route
 
 // Admin-only routes
 router.put("/:id/status", isAdmin, orderController.updateOrderStatus)
 router.put("/:id/payment", isAdmin, orderController.updatePaymentStatus)
 
 module.exports = router
-

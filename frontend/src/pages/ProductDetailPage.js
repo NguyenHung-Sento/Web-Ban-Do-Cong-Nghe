@@ -171,9 +171,6 @@ const ProductDetailPage = () => {
   // Xử lý khi thay đổi màu sắc
   const handleColorChange = (colorValue) => {
     setSelectedColor(colorValue)
-
-    // No need to manually set activeImage here as the ProductGallery component
-    // will handle finding and displaying the correct variant image
   }
 
   if (isLoading) {
@@ -208,16 +205,6 @@ const ProductDetailPage = () => {
 
   // Parse variants if it's a string
   const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants || {}
-  // Get product images - sử dụng hình ảnh theo màu nếu có
-  // let productImages = [product.image]
-  // if (product.images) {
-  //   productImages = Array.isArray(product.images) ? [product.image, ...product.images] : [product.image]
-  // }
-
-  // // Nếu có hình ảnh theo màu, thay thế hình ảnh đầu tiên
-  // if (currentImage && currentImage !== product.image) {
-  //   productImages[0] = currentImage
-  // }
 
   // Kiểm tra loại sản phẩm
   const isPhone = product.product_type === "phone"
@@ -300,7 +287,7 @@ const ProductDetailPage = () => {
                               ? "border-primary text-primary"
                               : "border-gray-medium text-dark"
                           }`}
-                          style={color.code ? { backgroundColor: color.code, color: "#fff" } : {}}
+                          style={color.code ? { backgroundColor: color.code, color: "#000" } : {}}
                         >
                           {color.label}
                         </button>

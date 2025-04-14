@@ -7,6 +7,7 @@ export const fetchProducts = createAsyncThunk("products/fetchProducts", async (p
     const response = await ProductService.getAllProducts(params)
     return response.data
   } catch (error) {
+    console.error("Error fetching products:", error) // Add error logging
     const message = error.response?.data?.message || "Không thể lấy danh sách sản phẩm"
     return rejectWithValue(message)
   }

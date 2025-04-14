@@ -9,7 +9,6 @@ const CartService = {
   // Cập nhật phương thức addItem để hỗ trợ các tùy chọn sản phẩm và giá biến thể
   addItem: async (cartData) => {
     try {
-      console.log("Cart service - adding item:", cartData) // Add logging
       const response = await api.post("/cart/items", cartData)
       return response.data
     } catch (error) {

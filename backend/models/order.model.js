@@ -46,6 +46,11 @@ const Order = {
     return order
   },
 
+  update: async (id, orderData) => {
+    const [result] = await db.query(`UPDATE orders SET ? WHERE id = ?`, [orderData, id])
+    return result.affectedRows > 0
+  },
+
   create: async (orderData, orderItems) => {
     // Start transaction
     await db.query("START TRANSACTION")
@@ -127,4 +132,3 @@ const Order = {
 }
 
 module.exports = Order
-

@@ -25,6 +25,7 @@ const ProductListPage = () => {
     price_min: "",
     price_max: "",
     sort: "newest",
+    search: "",
   })
 
   // Get query params
@@ -36,28 +37,54 @@ const ProductListPage = () => {
     const price_min = searchParams.get("price_min") || ""
     const price_max = searchParams.get("price_max") || ""
     const sort = searchParams.get("sort") || "newest"
+    const search = searchParams.get("search") || ""
 
+    // Update the filters state with values from URL
     setFilters({
       category_id,
       brand,
       price_min,
       price_max,
       sort,
+      search,
     })
 
-    dispatch(fetchProducts({ page, limit: 12, category_id, brand, price_min, price_max, sort }))
+    // Fetch products with the filters
+    dispatch(
+      fetchProducts({
+        page,
+        limit: 12,
+        category_id,
+        brand,
+        price_min,
+        price_max,
+        sort,
+        search,
+      }),
+    )
   }, [dispatch, location.search])
 
   // Handle filter change
   const handleFilterChange = (e) => {
     const { name, value } = e.target
     setFilters((prev) => ({ ...prev, [name]: value }))
+
+    // Apply sort filter immediately
+    if (name === "sort") {
+      const searchParams = new URLSearchParams(location.search)
+      searchParams.set(name, value)
+      navigate(`/products?${searchParams.toString()}`)
+    }
   }
 
   // Apply filters
   const applyFilters = () => {
     const searchParams = new URLSearchParams()
 
+    // Add page parameter
+    searchParams.append("page", 1) // Reset to page 1 when applying new filters
+
+    // Add all non-empty filters to the URL
     Object.entries(filters).forEach(([key, value]) => {
       if (value) {
         searchParams.append(key, value)
@@ -65,7 +92,6 @@ const ProductListPage = () => {
     })
 
     navigate(`/products?${searchParams.toString()}`)
-    setIsFilterOpen(false)
   }
 
   // Reset filters
@@ -76,10 +102,10 @@ const ProductListPage = () => {
       price_min: "",
       price_max: "",
       sort: "newest",
+      search: "",
     })
 
     navigate("/products")
-    setIsFilterOpen(false)
   }
 
   // Handle page change
@@ -92,11 +118,20 @@ const ProductListPage = () => {
   // Get unique brands from products
   const brands = [...new Set(products.map((product) => product.brand))]
 
+  // Determine if we're in search mode
+  const isSearchMode = !!filters.search
+
   return (
     <Layout>
       <div className="container-custom py-8">
         <div className="flex justify-between items-center mb-6">
-          <h1>Tất cả sản phẩm</h1>
+          <h1>
+            {isSearchMode
+              ? `Kết quả tìm kiếm cho "${filters.search}"`
+              : filters.category_id
+                ? categories.find((c) => c.id.toString() === filters.category_id)?.name || "Sản phẩm"
+                : "Tất cả sản phẩm"}
+          </h1>
 
           <div className="flex items-center">
             <div className="hidden md:block">
@@ -119,6 +154,23 @@ const ProductListPage = () => {
         <div className="flex flex-col md:flex-row">
           {/* Filters - Desktop */}
           <div className="hidden md:block w-64 mr-8">
+            {isSearchMode && (
+              <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+                <h3 className="font-bold text-lg mb-4">Tìm kiếm</h3>
+                <p className="text-gray-600 mb-2">Đang tìm kiếm: "{filters.search}"</p>
+                <button
+                  onClick={() => {
+                    const searchParams = new URLSearchParams(location.search)
+                    searchParams.delete("search")
+                    navigate(`/products?${searchParams.toString()}`)
+                  }}
+                  className="text-primary hover:underline text-sm"
+                >
+                  Xóa tìm kiếm
+                </button>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg shadow-md p-4 mb-6">
               <h3 className="font-bold text-lg mb-4">Danh mục</h3>
               <div className="space-y-2">
@@ -240,7 +292,11 @@ const ProductListPage = () => {
             ) : products.length === 0 ? (
               <div className="bg-white rounded-lg shadow-md p-8 text-center">
                 <h3 className="text-xl font-bold mb-2">Không tìm thấy sản phẩm</h3>
-                <p className="text-gray-dark mb-4">Không có sản phẩm nào phù hợp với bộ lọc của bạn.</p>
+                <p className="text-gray-dark mb-4">
+                  {isSearchMode
+                    ? `Không tìm thấy sản phẩm nào phù hợp với từ khóa "${filters.search}"`
+                    : "Không có sản phẩm nào phù hợp với bộ lọc của bạn."}
+                </p>
                 <button onClick={resetFilters} className="btn btn-primary">
                   Xóa bộ lọc
                 </button>
@@ -278,6 +334,23 @@ const ProductListPage = () => {
             </div>
 
             <div className="p-4 overflow-y-auto h-[calc(100%-60px)]">
+              {isSearchMode && (
+                <div className="mb-6">
+                  <h3 className="font-bold text-lg mb-4">Tìm kiếm</h3>
+                  <p className="text-gray-600 mb-2">Đang tìm kiếm: "{filters.search}"</p>
+                  <button
+                    onClick={() => {
+                      const searchParams = new URLSearchParams(location.search)
+                      searchParams.delete("search")
+                      navigate(`/products?${searchParams.toString()}`)
+                    }}
+                    className="text-primary hover:underline text-sm"
+                  >
+                    Xóa tìm kiếm
+                  </button>
+                </div>
+              )}
+
               <div className="mb-6">
                 <h3 className="font-bold text-lg mb-4">Sắp xếp</h3>
                 <select name="sort" value={filters.sort} onChange={handleFilterChange} className="form-input">
@@ -408,4 +481,3 @@ const ProductListPage = () => {
 }
 
 export default ProductListPage
-

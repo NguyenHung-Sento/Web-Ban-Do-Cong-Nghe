@@ -17,9 +17,6 @@ app.use(cors({
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// Serve static files from uploads directory
-app.use("/uploads", express.static(path.join(__dirname, "uploads")))
-
 // Basic route for testing
 app.get("/", (req, res) => {
   res.json({ message: "Chào mừng đến với API CellPhoneS Clone" })
@@ -33,6 +30,7 @@ app.use("/api/auth", require("./routes/auth.routes"))
 app.use("/api/orders", require("./routes/order.routes"))
 app.use("/api/cart", require("./routes/cart.routes"))
 app.use("/api/reviews", require("./routes/review.routes"))
+app.use("/api/payments", require("./routes/payment.routes"))
 
 // Error handling middleware
 app.use((err, req, res, next) => {

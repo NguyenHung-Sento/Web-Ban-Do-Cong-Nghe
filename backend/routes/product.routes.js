@@ -2,7 +2,6 @@ const express = require("express")
 const router = express.Router()
 const productController = require("../controllers/product.controller")
 const { authenticate, isAdmin } = require("../middleware/auth.middleware")
-const upload = require("../middleware/upload.middleware")
 const { validate, productRules } = require("../middleware/validator.middleware")
 
 // Public routes
@@ -19,20 +18,12 @@ router.get("/slug/:slug", productController.getProductBySlug)
 router.get("/type/:type", productController.getProductsByType)
 
 // Protected routes (admin only)
-router.post("/", authenticate, isAdmin, upload.single("image"), productRules, validate, productController.createProduct)
-router.put(
-  "/:id",
-  authenticate,
-  isAdmin,
-  upload.single("image"),
-  productRules,
-  validate,
-  productController.updateProduct,
-)
+router.post("/", authenticate, isAdmin, productRules, validate, productController.createProduct)
+router.put("/:id", authenticate, isAdmin, productRules, validate, productController.updateProduct)
 router.delete("/:id", authenticate, isAdmin, productController.deleteProduct)
 
-// Multiple image upload for product gallery
-router.post("/:id/gallery", authenticate, isAdmin, upload.array("images", 5), productController.uploadGallery)
+// Gallery management - now accepts URLs directly
+router.post("/:id/gallery", authenticate, isAdmin, productController.uploadGallery)
 
 module.exports = router
 

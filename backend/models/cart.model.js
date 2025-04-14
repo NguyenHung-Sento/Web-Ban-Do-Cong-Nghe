@@ -28,7 +28,6 @@ const Cart = {
   },
 
   addItem: async (userId, productId, quantity, options = null) => {
-    console.log("Cart model - Adding item:", { userId, productId, quantity, options }) // Add logging
 
     // Get cart or create if not exists
     const [cartRows] = await db.query(`SELECT * FROM carts WHERE user_id = ?`, [userId])
