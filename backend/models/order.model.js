@@ -33,7 +33,7 @@ const Order = {
     if (!orderRows[0]) return null
 
     const [itemRows] = await db.query(
-      `SELECT oi.*, oi.options, p.name as product_name, p.image as product_image 
+      `SELECT oi.*, oi.options, p.name as product_name, p.image as product_image, p.slug as product_slug
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
        WHERE oi.order_id = ?`,
@@ -128,6 +128,39 @@ const Order = {
   updatePaymentStatus: async (id, paymentStatus) => {
     const [result] = await db.query(`UPDATE orders SET payment_status = ? WHERE id = ?`, [paymentStatus, id])
     return result.affectedRows > 0
+  },
+
+  // Kiểm tra xem người dùng có thể đánh giá sản phẩm hay không
+  canUserReviewProduct: async (userId, productId) => {
+    const [rows] = await db.query(
+      `SELECT o.id 
+       FROM orders o
+       JOIN order_items oi ON o.id = oi.order_id
+       WHERE o.user_id = ? 
+       AND oi.product_id = ? 
+       AND o.status = 'delivered'
+       LIMIT 1`,
+      [userId, productId],
+    )
+
+    return rows.length > 0
+  },
+
+  // Lấy danh sách sản phẩm mà người dùng có thể đánh giá
+  getReviewableProducts: async (userId) => {
+    const [rows] = await db.query(
+      `SELECT DISTINCT p.id, p.name, p.image, p.slug
+       FROM orders o
+       JOIN order_items oi ON o.id = oi.order_id
+       JOIN products p ON oi.product_id = p.id
+       LEFT JOIN reviews r ON r.product_id = p.id AND r.user_id = ?
+       WHERE o.user_id = ? 
+       AND o.status = 'delivered'
+       AND r.id IS NULL`,
+      [userId, userId],
+    )
+
+    return rows
   },
 }
 

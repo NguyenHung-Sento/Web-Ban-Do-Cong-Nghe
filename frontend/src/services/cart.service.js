@@ -18,8 +18,13 @@ const CartService = {
   },
 
   updateItem: async (itemId, quantity) => {
-    const response = await api.put(`/cart/items/${itemId}`, { quantity })
-    return response.data
+    try {
+      const response = await api.put(`/cart/items/${itemId}`, { quantity })
+      return response.data
+    } catch (error) {
+      console.error("Update Item Error:", error.response?.data || error.message)
+      throw error
+    }
   },
 
   removeItem: async (itemId) => {

@@ -27,7 +27,7 @@ export const addToCart = createAsyncThunk(
       }
 
       const response = await CartService.addItem(requestData)
-      toast.success("Đã thêm sản phẩm vào giỏ hàng")
+      // Loại bỏ toast ở đây để tránh hiển thị 2 lần
       return response.data.cart
     } catch (error) {
       console.error("Error adding to cart:", error)
@@ -248,4 +248,3 @@ const cartSlice = createSlice({
 export const { resetCartError, toggleSelectItem, selectAllItems } = cartSlice.actions
 
 export default cartSlice.reducer
-

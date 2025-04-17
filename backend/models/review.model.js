@@ -61,7 +61,34 @@ const Review = {
     )
     return rows
   },
+
+  // Kiểm tra xem người dùng đã mua sản phẩm và thanh toán chưa
+  checkUserPurchased: async (userId, productId) => {
+    const [rows] = await db.query(
+      `SELECT o.id 
+       FROM orders o
+       JOIN order_items oi ON o.id = oi.order_id
+       WHERE o.user_id = ? 
+       AND oi.product_id = ? 
+       AND o.payment_status = 'paid'
+       AND o.status IN ('delivered', 'completed')
+       LIMIT 1`,
+      [userId, productId],
+    )
+    return rows.length > 0
+  },
+
+  // Kiểm tra xem người dùng đã đánh giá sản phẩm chưa
+  checkUserReviewed: async (userId, productId) => {
+    const [rows] = await db.query(`SELECT id FROM reviews WHERE user_id = ? AND product_id = ?`, [userId, productId])
+    return rows.length > 0
+  },
+
+  // Lấy đánh giá của người dùng cho sản phẩm
+  getUserReview: async (userId, productId) => {
+    const [rows] = await db.query(`SELECT * FROM reviews WHERE user_id = ? AND product_id = ?`, [userId, productId])
+    return rows[0]
+  },
 }
 
 module.exports = Review
-

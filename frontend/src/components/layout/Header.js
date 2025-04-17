@@ -37,9 +37,9 @@ const Header = () => {
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener("click", handleClickOutside)
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("click", handleClickOutside)
     }
   }, [])
 
@@ -126,7 +126,7 @@ const Header = () => {
         <div className="flex items-center justify-between px-32">
           {/* Logo */}
           <Link to="/" className="text-2xl font-bold text-white">
-            CellPhoneS
+            CellPhone
           </Link>
 
           {/* Search bar - hidden on mobile */}

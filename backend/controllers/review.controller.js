@@ -25,6 +25,19 @@ exports.getProductReviews = async (req, res, next) => {
     const averageRating = await Review.getAverageRating(productId)
     const ratingDistribution = await Review.getRatingDistribution(productId)
 
+    // Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
+    let userReview = null
+    let canReview = false
+
+    if (req.user) {
+      userReview = await Review.getUserReview(req.user.id, productId)
+
+      // Kiểm tra xem người dùng đã mua sản phẩm và thanh toán chưa
+      if (!userReview) {
+        canReview = await Review.checkUserPurchased(req.user.id, productId)
+      }
+    }
+
     res.json({
       status: "success",
       data: {
@@ -39,6 +52,8 @@ exports.getProductReviews = async (req, res, next) => {
           average_rating: Number.parseFloat(averageRating).toFixed(1),
           rating_distribution: ratingDistribution,
         },
+        user_review: userReview,
+        can_review: canReview,
       },
     })
   } catch (error) {
@@ -63,15 +78,20 @@ exports.createReview = async (req, res, next) => {
     }
 
     // Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
-    const [existingReviews] = await db.query(`SELECT * FROM reviews WHERE product_id = ? AND user_id = ?`, [
-      productId,
-      req.user.id,
-    ])
-
-    if (existingReviews.length > 0) {
+    const hasReviewed = await Review.checkUserReviewed(req.user.id, productId)
+    if (hasReviewed) {
       return res.status(400).json({
         status: "error",
         message: "Bạn đã đánh giá sản phẩm này rồi",
+      })
+    }
+
+    // Kiểm tra xem người dùng đã mua sản phẩm và thanh toán chưa
+    const hasPurchased = await Review.checkUserPurchased(req.user.id, productId)
+    if (!hasPurchased) {
+      return res.status(403).json({
+        status: "error",
+        message: "Bạn cần mua sản phẩm và hoàn tất thanh toán trước khi đánh giá",
       })
     }
 
@@ -182,3 +202,42 @@ exports.deleteReview = async (req, res, next) => {
   }
 }
 
+// Kiểm tra xem người dùng có thể đánh giá sản phẩm không
+exports.checkCanReview = async (req, res, next) => {
+  try {
+    const productId = req.params.productId
+
+    // Kiểm tra xem sản phẩm có tồn tại không
+    const product = await Product.findById(productId)
+    if (!product) {
+      return res.status(404).json({
+        status: "error",
+        message: "Không tìm thấy sản phẩm",
+      })
+    }
+
+    // Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
+    const hasReviewed = await Review.checkUserReviewed(req.user.id, productId)
+
+    // Kiểm tra xem người dùng đã mua sản phẩm và thanh toán chưa
+    const hasPurchased = await Review.checkUserPurchased(req.user.id, productId)
+
+    // Lấy đánh giá của người dùng nếu có
+    let userReview = null
+    if (hasReviewed) {
+      userReview = await Review.getUserReview(req.user.id, productId)
+    }
+
+    res.json({
+      status: "success",
+      data: {
+        can_review: !hasReviewed && hasPurchased,
+        has_reviewed: hasReviewed,
+        has_purchased: hasPurchased,
+        user_review: userReview,
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}

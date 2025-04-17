@@ -10,7 +10,7 @@ const Rating = ({ value, text, color = "text-yellow-400" }) => {
           ) : value >= star - 0.5 ? (
             <FiStar className={`${color} fill-current`} style={{ clipPath: "inset(0 50% 0 0)" }} />
           ) : (
-            <FiStar className="text-gray-dark" />
+            <FiStar className="text-gray-300" />
           )}
         </span>
       ))}
@@ -20,4 +20,3 @@ const Rating = ({ value, text, color = "text-yellow-400" }) => {
 }
 
 export default Rating
-

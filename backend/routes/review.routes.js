@@ -8,6 +8,9 @@ const { body } = require("express-validator")
 // Get reviews for a product (public)
 router.get("/products/:productId", reviewController.getProductReviews)
 
+// Check if user can review a product (authenticated)
+router.get("/check/:productId", authenticate, reviewController.checkCanReview)
+
 // Protected routes
 router.post(
   "/products/:productId",
@@ -34,4 +37,3 @@ router.put(
 router.delete("/:reviewId", authenticate, reviewController.deleteReview)
 
 module.exports = router
-

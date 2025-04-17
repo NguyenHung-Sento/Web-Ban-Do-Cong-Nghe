@@ -1,10 +1,26 @@
-const Product = require("../models/product.model")
 const Cart = require("../models/cart.model")
+const Product = require("../models/product.model")
+const ProductVariant = require("../models/product_variant.model")
 
-// Cập nhật phương thức addItem để hỗ trợ các tùy chọn sản phẩm và hình ảnh biến thể
+// Lấy giỏ hàng
+exports.getCart = async (req, res, next) => {
+  try {
+    const cart = await Cart.findByUserId(req.user.id)
+
+    res.json({
+      status: "success",
+      data: {
+        cart,
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// Thêm sản phẩm vào giỏ hàng
 exports.addItem = async (req, res, next) => {
   try {
-
     const { product_id, quantity, options, variant_image } = req.body
 
     if (!product_id || !quantity || quantity < 1) {
@@ -29,104 +45,29 @@ exports.addItem = async (req, res, next) => {
     if (options) {
       try {
         parsedOptions = typeof options === "string" ? JSON.parse(options) : options
-
-        // Add variant image to options if provided
-        if (variant_image && typeof variant_image === "string") {
-          parsedOptions.variantImage = variant_image
-        }
       } catch (e) {
-        console.error("Error parsing options:", e)
         return res.status(400).json({
           status: "error",
           message: "Định dạng tùy chọn không hợp lệ",
         })
       }
-    } else if (variant_image) {
-      // If no options but variant_image is provided, create options object
-      parsedOptions = { variantImage: variant_image }
     }
 
-    // Kiểm tra tồn kho dựa trên biến thể
-    let availableStock = product.stock
-
-    if (product.variants) {
-      const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
-
-      // Kiểm tra tồn kho cho sản phẩm điện thoại
-      if (product.product_type === "phone" && parsedOptions && parsedOptions.color && parsedOptions.storage) {
-        if (variants.combinations) {
-          const combination = variants.combinations.find(
-            (c) => c.color === parsedOptions.color && c.storage === parsedOptions.storage,
-          )
-          if (combination) {
-            availableStock = combination.stock
-          }
-        }
-      }
-
-      // Kiểm tra tồn kho cho sản phẩm laptop
-      else if (product.product_type === "laptop" && parsedOptions && parsedOptions.config) {
-        if (variants.configs) {
-          const config = variants.configs.find((c) => c.value === parsedOptions.config)
-          if (config && config.stock !== undefined) {
-            availableStock = config.stock
-          }
-        }
-      }
-    }
-
-    if (availableStock < quantity) {
+    // Kiểm tra tồn kho
+    const hasStock = await Product.checkStock(product_id, parsedOptions, quantity)
+    if (!hasStock) {
       return res.status(400).json({
         status: "error",
         message: "Không đủ số lượng sản phẩm trong kho",
       })
     }
 
-    try {
-      const cart = await Cart.addItem(req.user.id, product_id, quantity, parsedOptions)
-      
-      cart.items.forEach((item) => {
-        // If item has variant image in options, use that instead
-        if (item.options && item.options.variantImage) {
-          item.image = item.options.variantImage
-        }
-      })
-
-      res.json({
-        status: "success",
-        message: "Thêm sản phẩm vào giỏ hàng thành công",
-        data: {
-          cart,
-        },
-      })
-    } catch (error) {
-      console.error("Error in Cart.addItem:", error)
-      return res.status(500).json({
-        status: "error",
-        message: "Lỗi khi thêm vào giỏ hàng: " + error.message,
-      })
-    }
-  } catch (error) {
-    console.error("Unexpected error in addItem controller:", error)
-    next(error)
-  }
-}
-
-// Get cart
-exports.getCart = async (req, res, next) => {
-  try {
-    const cart = await Cart.findByUserId(req.user.id)
-
-    // Thêm URL đầy đủ cho hình ảnh sản phẩm và xử lý hình ảnh biến thể
-    cart.items.forEach((item) => {
-      // If item has variant image in options, use that instead
-      if (item.options && item.options.variantImage) {
-        item.image = item.options.variantImage
-      }
-    })
+    // Thêm sản phẩm vào giỏ hàng - bao gồm cả variant_image nếu có
+    const cart = await Cart.addItem(req.user.id, product_id, quantity, parsedOptions, variant_image)
 
     res.json({
       status: "success",
+      message: "Thêm sản phẩm vào giỏ hàng thành công",
       data: {
         cart,
       },
@@ -136,9 +77,10 @@ exports.getCart = async (req, res, next) => {
   }
 }
 
-// Update cart item
+// Cập nhật số lượng sản phẩm trong giỏ hàng
 exports.updateItem = async (req, res, next) => {
   try {
+    const { itemId } = req.params
     const { quantity } = req.body
 
     if (!quantity || quantity < 1) {
@@ -148,21 +90,63 @@ exports.updateItem = async (req, res, next) => {
       })
     }
 
-    const cart = await Cart.updateItem(req.user.id, req.params.itemId, quantity)
+    // Lấy thông tin item trong giỏ hàng
+    const cartItem = await Cart.findItemById(itemId)
+    if (!cartItem) {
+      return res.status(404).json({
+        status: "error",
+        message: "Không tìm thấy sản phẩm trong giỏ hàng",
+      })
+    }
 
-    // xử lý hình ảnh biến thể
-    cart.items.forEach((item) => {
-      // If item has variant image in options, use that instead
-      if (item.options && item.options.variantImage) {
-        item.image = item.options.variantImage
+    // Kiểm tra quyền truy cập
+    const cart = await Cart.findById(cartItem.cart_id)
+    if (cart.user_id !== req.user.id) {
+      return res.status(403).json({
+        status: "error",
+        message: "Bạn không có quyền cập nhật giỏ hàng này",
+      })
+    }
+
+    // Parse options nếu có
+    let parsedOptions = null
+    if (cartItem.options) {
+      try {
+        parsedOptions = typeof cartItem.options === "string" ? JSON.parse(cartItem.options) : cartItem.options
+      } catch (e) {
+        return res.status(400).json({
+          status: "error",
+          message: "Định dạng tùy chọn không hợp lệ",
+        })
       }
-    })
+    }
+
+    // Kiểm tra tồn kho
+    const hasStock = await Product.checkStock(cartItem.product_id, parsedOptions, quantity)
+    if (!hasStock) {
+      return res.status(400).json({
+        status: "error",
+        message: "Không đủ số lượng sản phẩm trong kho",
+      })
+    }
+
+    // Cập nhật số lượng
+    const updated = await Cart.updateItem(itemId, req.user.id, { quantity })
+
+    if (!updated) {
+      return res.status(404).json({
+        status: "error",
+        message: "Không tìm thấy sản phẩm trong giỏ hàng",
+      })
+    }
+
+    const updatedCart = await Cart.findByUserId(req.user.id)
 
     res.json({
       status: "success",
       message: "Cập nhật giỏ hàng thành công",
       data: {
-        cart,
+        cart: updatedCart,
       },
     })
   } catch (error) {
@@ -170,24 +154,45 @@ exports.updateItem = async (req, res, next) => {
   }
 }
 
-// Remove cart item
+// Xóa sản phẩm khỏi giỏ hàng
 exports.removeItem = async (req, res, next) => {
   try {
-    const cart = await Cart.removeItem(req.user.id, req.params.itemId)
+    const { itemId } = req.params
 
-    // xử lý hình ảnh biến thể
-    cart.items.forEach((item) => {
-      // If item has variant image in options, use that instead
-      if (item.options && item.options.variantImage) {
-        item.image = item.options.variantImage
-      }
-    })
+    // Lấy thông tin item trong giỏ hàng
+    const cartItem = await Cart.findCartItemById(itemId)
+    if (!cartItem) {
+      return res.status(404).json({
+        status: "error",
+        message: "Không tìm thấy sản phẩm trong giỏ hàng",
+      })
+    }
+
+    // Kiểm tra quyền truy cập
+    if (cartItem.user_id !== req.user.id) {
+      return res.status(403).json({
+        status: "error",
+        message: "Bạn không có quyền xóa sản phẩm khỏi giỏ hàng này",
+      })
+    }
+
+    // Xóa sản phẩm khỏi giỏ hàng
+    const removed = await Cart.removeItem(itemId, req.user.id)
+
+    if (!removed) {
+      return res.status(404).json({
+        status: "error",
+        message: "Không tìm thấy sản phẩm trong giỏ hàng",
+      })
+    }
+
+    const updatedCart = await Cart.findByUserId(req.user.id)
 
     res.json({
       status: "success",
       message: "Xóa sản phẩm khỏi giỏ hàng thành công",
       data: {
-        cart,
+        cart: updatedCart,
       },
     })
   } catch (error) {
@@ -195,7 +200,7 @@ exports.removeItem = async (req, res, next) => {
   }
 }
 
-// Clear cart
+// Xóa toàn bộ giỏ hàng
 exports.clearCart = async (req, res, next) => {
   try {
     const cart = await Cart.clearCart(req.user.id)
@@ -211,4 +216,3 @@ exports.clearCart = async (req, res, next) => {
     next(error)
   }
 }
-

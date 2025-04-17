@@ -7,11 +7,13 @@ import Layout from "../components/layout/Layout"
 import Spinner from "../components/ui/Spinner"
 import Rating from "../components/ui/Rating"
 import ProductSlider from "../components/ui/ProductSlider"
+import ReviewList from "../components/review/ReviewList"
 import { fetchProductBySlug, fetchRelatedProducts } from "../features/products/productSlice"
 import { addToCart } from "../features/cart/cartSlice"
 import { FiMinus, FiPlus, FiShoppingCart, FiAlertCircle } from "react-icons/fi"
 import { useLoginPrompt } from "../contexts/LoginPromptContext"
 import ProductGallery from "../components/ui/ProductGallery"
+import { toast } from "react-toastify"
 
 const ProductDetailPage = () => {
   const { slug } = useParams()
@@ -24,6 +26,7 @@ const ProductDetailPage = () => {
   const [quantity, setQuantity] = useState(1)
   const [activeTab, setActiveTab] = useState("description")
   const [activeImage, setActiveImage] = useState(0)
+  const [isAddingToCart, setIsAddingToCart] = useState(false)
 
   // Thêm state cho các tùy chọn sản phẩm
   const [selectedColor, setSelectedColor] = useState("")
@@ -100,15 +103,41 @@ const ProductDetailPage = () => {
         }
       }
 
+      // Kiểm tra tồn kho từ product_variants nếu có
+      if (product.product_variants) {
+        const variantKey = `color:${selectedColor}|storage:${selectedStorage}`
+        const productVariant = product.product_variants.find((v) => v.variant_key === variantKey)
+        if (productVariant) {
+          variantStock = productVariant.stock
+          if (productVariant.price) {
+            variantPrice = productVariant.price
+          }
+        }
+      }
+
       return { currentPrice: variantPrice, currentStock: variantStock, currentImage: variantImage }
     }
 
     // Xử lý cho sản phẩm laptop (có cấu hình)
     else if (product.product_type === "laptop" && variants.configs) {
       const selectedConfigOption = variants.configs.find((c) => c.value === selectedConfig)
+
+      // Kiểm tra tồn kho từ product_variants nếu có
+      if (product.product_variants) {
+        const variantKey = `config:${selectedConfig}`
+        const productVariant = product.product_variants.find((v) => v.variant_key === variantKey)
+        if (productVariant) {
+          return {
+            currentPrice: productVariant.price || product.sale_price || product.price,
+            currentStock: productVariant.stock,
+            currentImage: product.image,
+          }
+        }
+      }
+
       if (selectedConfigOption) {
         return {
-          currentPrice: selectedConfigOption.price || product.price,
+          currentPrice: selectedConfigOption.price || product.sale_price || product.price,
           currentStock: selectedConfigOption.stock || product.stock,
           currentImage: product.image,
         }
@@ -129,43 +158,64 @@ const ProductDetailPage = () => {
     }
   }
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!isLoggedIn) {
       // Use the global login prompt
       showLoginPrompt(`/product/${slug}`)
       return
     }
 
-    // Get the variant image if a color is selected
-    let variantImage = null
-    if (selectedColor && product.variants) {
-      const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
-      if (variants.colors) {
-        const selectedColorOption = variants.colors.find((c) => c.value === selectedColor)
-        if (selectedColorOption && selectedColorOption.image) {
-          variantImage = selectedColorOption.image
-        }
-      }
+    // Kiểm tra tồn kho
+    if (currentStock <= 0) {
+      toast.error("Sản phẩm đã hết hàng")
+      return
     }
 
-    // Thêm các tùy chọn vào thông tin sản phẩm khi thêm vào giỏ hàng
-    const productOptions = {}
+    if (quantity > currentStock) {
+      toast.error(`Chỉ còn ${currentStock} sản phẩm trong kho`)
+      return
+    }
 
-    if (selectedColor) productOptions.color = selectedColor
-    if (selectedStorage) productOptions.storage = selectedStorage
-    if (selectedConfig) productOptions.config = selectedConfig
+    setIsAddingToCart(true)
 
-    // Thêm giá biến thể vào options để lưu trong giỏ hàng
-    productOptions.variantPrice = currentPrice
+    try {
+      // Get the variant image if a color is selected
+      let variantImage = null
+      if (selectedColor && product.variants) {
+        const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
+        if (variants.colors) {
+          const selectedColorOption = variants.colors.find((c) => c.value === selectedColor)
+          if (selectedColorOption && selectedColorOption.image) {
+            variantImage = selectedColorOption.image
+          }
+        }
+      }
 
-    dispatch(
-      addToCart({
-        productId: product.id,
-        quantity,
-        options: Object.keys(productOptions).length > 0 ? productOptions : undefined,
-        variantImage: variantImage,
-      }),
-    )
+      // Thêm các tùy chọn vào thông tin sản phẩm khi thêm vào giỏ hàng
+      const productOptions = {}
+
+      if (selectedColor) productOptions.color = selectedColor
+      if (selectedStorage) productOptions.storage = selectedStorage
+      if (selectedConfig) productOptions.config = selectedConfig
+
+      // Thêm giá biến thể vào options để lưu trong giỏ hàng
+      productOptions.variantPrice = currentPrice
+
+      await dispatch(
+        addToCart({
+          productId: product.id,
+          quantity,
+          options: Object.keys(productOptions).length > 0 ? productOptions : undefined,
+          variantImage: variantImage,
+        }),
+      )
+
+      toast.success("Đã thêm sản phẩm vào giỏ hàng")
+    } catch (error) {
+      toast.error("Không thể thêm sản phẩm vào giỏ hàng")
+    } finally {
+      setIsAddingToCart(false)
+    }
   }
 
   // Xử lý khi thay đổi màu sắc
@@ -318,6 +368,15 @@ const ProductDetailPage = () => {
                           }
                         }
 
+                        // Kiểm tra tồn kho từ product_variants nếu có
+                        if (product.product_variants) {
+                          const variantKey = `color:${selectedColor}|storage:${storage.value}`
+                          const productVariant = product.product_variants.find((v) => v.variant_key === variantKey)
+                          if (productVariant) {
+                            isOutOfStock = productVariant.stock <= 0
+                          }
+                        }
+
                         return (
                           <button
                             key={storage.value}
@@ -357,7 +416,16 @@ const ProductDetailPage = () => {
                     <span className="w-24 text-gray-dark mt-2">Cấu hình:</span>
                     <div className="flex flex-col gap-2 w-full">
                       {variants.configs.map((config) => {
-                        const isOutOfStock = config.stock <= 0
+                        let isOutOfStock = config.stock <= 0
+
+                        // Kiểm tra tồn kho từ product_variants nếu có
+                        if (product.product_variants) {
+                          const variantKey = `config:${config.value}`
+                          const productVariant = product.product_variants.find((v) => v.variant_key === variantKey)
+                          if (productVariant) {
+                            isOutOfStock = productVariant.stock <= 0
+                          }
+                        }
 
                         return (
                           <button
@@ -429,10 +497,16 @@ const ProductDetailPage = () => {
                 <button
                   onClick={handleAddToCart}
                   className="btn btn-primary flex items-center justify-center"
-                  disabled={currentStock <= 0}
+                  disabled={currentStock <= 0 || isAddingToCart}
                 >
-                  <FiShoppingCart className="mr-2" />
-                  {currentStock > 0 ? "Thêm vào giỏ hàng" : "Hết hàng"}
+                  {isAddingToCart ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    <>
+                      <FiShoppingCart className="mr-2" />
+                      {currentStock > 0 ? "Thêm vào giỏ hàng" : "Hết hàng"}
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -502,7 +576,7 @@ const ProductDetailPage = () => {
 
             {activeTab === "reviews" && (
               <div>
-                <p>Chưa có đánh giá nào cho sản phẩm này.</p>
+                <ReviewList productId={product.id} />
               </div>
             )}
           </div>
@@ -516,4 +590,3 @@ const ProductDetailPage = () => {
 }
 
 export default ProductDetailPage
-

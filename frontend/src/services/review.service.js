@@ -20,7 +20,11 @@ const ReviewService = {
     const response = await api.delete(`/reviews/${reviewId}`)
     return response.data
   },
+
+  checkCanReview: async (productId) => {
+    const response = await api.get(`/reviews/check/${productId}`)
+    return response.data
+  },
 }
 
 export default ReviewService
-

@@ -1,4 +1,5 @@
 const Order = require("../models/order.model")
+const Product = require("../models/product.model")
 const db = require("../config/db.config") // Import the database connection
 
 // Lấy tất cả đơn hàng (admin) hoặc đơn hàng của người dùng (khách hàng)
@@ -63,39 +64,84 @@ exports.createOrder = async (req, res, next) => {
       })
     }
 
-    // Tính tổng tiền
-    let totalAmount = 0
-    const orderItems = []
+    // Bắt đầu transaction
+    await db.query("START TRANSACTION")
 
-    for (const item of items) {
-      const { product_id, quantity, price } = item
-      totalAmount += price * quantity
+    try {
+      // Kiểm tra tồn kho cho tất cả sản phẩm
+      for (const item of items) {
+        const { product_id, quantity, options } = item
 
-      orderItems.push({
-        product_id,
-        quantity,
-        price,
+        // Parse options nếu là chuỗi
+        let parsedOptions = null
+        if (options) {
+          parsedOptions = typeof options === "string" ? JSON.parse(options) : options
+        }
+
+        // Kiểm tra tồn kho
+        const hasStock = await Product.checkStock(product_id, parsedOptions, quantity)
+        if (!hasStock) {
+          // Rollback transaction
+          await db.query("ROLLBACK")
+
+          return res.status(400).json({
+            status: "error",
+            message: `Sản phẩm ID ${product_id} không đủ số lượng trong kho`,
+          })
+        }
+      }
+
+      // Tính tổng tiền
+      let totalAmount = 0
+      const orderItems = []
+
+      for (const item of items) {
+        const { product_id, quantity, price, options } = item
+        totalAmount += price * quantity
+
+        // Parse options nếu là chuỗi
+        let parsedOptions = null
+        if (options) {
+          parsedOptions = typeof options === "string" ? JSON.parse(options) : options
+        }
+
+        orderItems.push({
+          product_id,
+          quantity,
+          price,
+          options: options ? JSON.stringify(options) : null,
+        })
+
+        // Giảm tồn kho
+        await Product.reduceStock(product_id, parsedOptions, quantity)
+      }
+
+      const orderData = {
+        user_id: req.user.id,
+        total_amount: totalAmount,
+        shipping_address,
+        payment_method,
+        status: "pending",
+        payment_status: "pending",
+      }
+
+      const orderId = await Order.create(orderData, orderItems)
+
+      // Commit transaction
+      await db.query("COMMIT")
+
+      res.status(201).json({
+        status: "success",
+        message: "Tạo đơn hàng thành công",
+        data: {
+          id: orderId,
+        },
       })
+    } catch (error) {
+      // Rollback transaction nếu có lỗi
+      await db.query("ROLLBACK")
+      throw error
     }
-
-    const orderData = {
-      user_id: req.user.id,
-      total_amount: totalAmount,
-      shipping_address,
-      payment_method,
-      status: "pending",
-      payment_status: "pending",
-    }
-
-    const orderId = await Order.create(orderData, orderItems)
-
-    res.status(201).json({
-      status: "success",
-      message: "Tạo đơn hàng thành công",
-      data: {
-        id: orderId,
-      },
-    })
   } catch (error) {
     next(error)
   }
@@ -113,19 +159,74 @@ exports.updateOrderStatus = async (req, res, next) => {
       })
     }
 
-    const success = await Order.updateStatus(req.params.id, status)
-
-    if (!success) {
+    // Lấy thông tin đơn hàng hiện tại
+    const order = await Order.findById(req.params.id)
+    if (!order) {
       return res.status(404).json({
         status: "error",
-        message: "Không tìm thấy đơn hàng hoặc không có thay đổi",
+        message: "Không tìm thấy đơn hàng",
       })
     }
 
-    res.json({
-      status: "success",
-      message: "Cập nhật trạng thái đơn hàng thành công",
-    })
+    // Nếu đơn hàng đang bị hủy, khôi phục tồn kho
+    if (status === "cancelled" && order.status !== "cancelled") {
+      // Bắt đầu transaction
+      await db.query("START TRANSACTION")
+
+      try {
+        // Khôi phục tồn kho cho tất cả sản phẩm trong đơn hàng
+        for (const item of order.items) {
+          // Parse options nếu có
+          let parsedOptions = null
+          if (item.options) {
+            parsedOptions = typeof item.options === "string" ? JSON.parse(item.options) : item.options
+          }
+
+          // Khôi phục tồn kho
+          await Product.restoreStock(item.product_id, parsedOptions, item.quantity)
+        }
+
+        // Cập nhật trạng thái đơn hàng
+        const success = await Order.updateStatus(req.params.id, status)
+
+        if (!success) {
+          // Rollback transaction
+          await db.query("ROLLBACK")
+
+          return res.status(404).json({
+            status: "error",
+            message: "Không tìm thấy đơn hàng hoặc không có thay đổi",
+          })
+        }
+
+        // Commit transaction
+        await db.query("COMMIT")
+
+        res.json({
+          status: "success",
+          message: "Cập nhật trạng thái đơn hàng thành công",
+        })
+      } catch (error) {
+        // Rollback transaction nếu có lỗi
+        await db.query("ROLLBACK")
+        throw error
+      }
+    } else {
+      // Cập nhật trạng thái đơn hàng bình thường
+      const success = await Order.updateStatus(req.params.id, status)
+
+      if (!success) {
+        return res.status(404).json({
+          status: "error",
+          message: "Không tìm thấy đơn hàng hoặc không có thay đổi",
+        })
+      }
+
+      res.json({
+        status: "success",
+        message: "Cập nhật trạng thái đơn hàng thành công",
+      })
+    }
   } catch (error) {
     next(error)
   }
@@ -161,7 +262,7 @@ exports.updatePaymentStatus = async (req, res, next) => {
   }
 }
 
-// Add a new method to delete an order
+// Hủy đơn hàng
 exports.deleteOrder = async (req, res, next) => {
   try {
     const orderId = req.params.id
@@ -198,47 +299,14 @@ exports.deleteOrder = async (req, res, next) => {
     try {
       // Restore product stock for each item
       for (const item of order.items) {
-        // Update product stock
-        await db.query(`UPDATE products SET stock = stock + ? WHERE id = ?`, [item.quantity, item.product_id])
-
-        // If there are options, update variant stock
+        // Parse options nếu có
+        let parsedOptions = null
         if (item.options) {
-          const options = typeof item.options === "string" ? JSON.parse(item.options) : item.options
-          const product = await db.query(`SELECT * FROM products WHERE id = ?`, [item.product_id])
-
-          if (product[0][0] && product[0][0].variants) {
-            const variants =
-              typeof product[0][0].variants === "string" ? JSON.parse(product[0][0].variants) : product[0][0].variants
-
-            // Update stock for phone variants
-            if (product[0][0].product_type === "phone" && options.color && options.storage && variants.combinations) {
-              const combinationIndex = variants.combinations.findIndex(
-                (c) => c.color === options.color && c.storage === options.storage,
-              )
-
-              if (combinationIndex !== -1) {
-                variants.combinations[combinationIndex].stock += item.quantity
-                await db.query(`UPDATE products SET variants = ? WHERE id = ?`, [
-                  JSON.stringify(variants),
-                  item.product_id,
-                ])
-              }
-            }
-
-            // Update stock for laptop variants
-            else if (product[0][0].product_type === "laptop" && options.config && variants.configs) {
-              const configIndex = variants.configs.findIndex((c) => c.value === options.config)
-
-              if (configIndex !== -1 && variants.configs[configIndex].stock !== undefined) {
-                variants.configs[configIndex].stock += item.quantity
-                await db.query(`UPDATE products SET variants = ? WHERE id = ?`, [
-                  JSON.stringify(variants),
-                  item.product_id,
-                ])
-              }
-            }
-          }
+          parsedOptions = typeof item.options === "string" ? JSON.parse(item.options) : item.options
         }
+
+        // Khôi phục tồn kho
+        await Product.restoreStock(item.product_id, parsedOptions, item.quantity)
       }
 
       // Delete order items
