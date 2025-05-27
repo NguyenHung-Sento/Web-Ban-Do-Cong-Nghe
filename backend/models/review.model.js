@@ -76,7 +76,7 @@ const Review = {
     const [rows] = await db.query(
       `SELECT AVG(rating) as average_rating 
      FROM reviews 
-     WHERE product_id = ? AND parent_id IS NULL AND is_admin_reply IS NULL AND rating IS NOT NULL`,
+     WHERE product_id = ? AND parent_id IS NULL AND is_admin_reply = 0 AND rating IS NOT NULL`,
       [productId],
     )
     return rows[0].average_rating || 0
@@ -86,7 +86,7 @@ const Review = {
     const [rows] = await db.query(
       `SELECT rating, COUNT(*) as count
      FROM reviews
-     WHERE product_id = ? AND parent_id IS NULL AND is_admin_reply IS NULL AND rating IS NOT NULL
+     WHERE product_id = ? AND parent_id IS NULL AND is_admin_reply = 0 AND rating IS NOT NULL
      GROUP BY rating
      ORDER BY rating DESC`,
       [productId],
