@@ -1,9 +1,8 @@
 import axios from "axios"
 
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api"
-
+// Create axios instance
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -18,7 +17,7 @@ api.interceptors.request.use(
 
     // If token exists, add to headers
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      config.headers["Authorization"] = `Bearer ${token}`
     }
 
     return config
@@ -37,39 +36,40 @@ api.interceptors.response.use(
     const originalRequest = error.config
 
     // If error is 401 (Unauthorized) and not already retrying
-    if (error.response?.status === 401 && error.response?.data?.tokenExpired && !originalRequest._retry) {
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
 
       try {
-        // Call refresh token endpoint
-        const response = await axios.post(`${API_URL}/auth/refresh-token`, {}, { withCredentials: true })
+        // Try to refresh the token
+        const response = await axios.post(
+          `${process.env.REACT_APP_API_URL || "http://localhost:5000/api"}/auth/refresh-token`,
+          {},
+          { withCredentials: true },
+        )
 
-        // If refresh successful, update token
-        if (response.data.status === "success") {
-          localStorage.setItem("token", response.data.data.accessToken)
+        // If refresh successful, update token and retry
+        if (response.data.status === "success" && response.data.data && response.data.data.accessToken) {
+          const newToken = response.data.data.accessToken
+          localStorage.setItem("token", newToken)
 
-          // Update Authorization header
-          originalRequest.headers.Authorization = `Bearer ${response.data.data.accessToken}`
+          // Update the Authorization header
+          originalRequest.headers["Authorization"] = `Bearer ${newToken}`
 
-          // Retry original request
-          return api(originalRequest)
+          // Retry the original request
+          return axios(originalRequest)
         }
       } catch (refreshError) {
-        // If refresh fails, logout user
+        console.error("Token refresh failed:", refreshError)
+
+        // Clear auth data on refresh failure
         localStorage.removeItem("token")
         localStorage.removeItem("user")
 
-        // Redirect to login page
-        window.location.href = "/login"
-
-        return Promise.reject(refreshError)
+        // Redirect to login if in browser environment
+        if (typeof window !== "undefined") {
+          window.location.href = "/login"
+        }
       }
-    }
-
-    // Don't show the default "Không có token xác thực" message for 401 errors
-    // Let the individual services handle these errors
-    if (error.response?.status === 401 && error.response?.data?.message === "Không có token xác thực") {
-      return Promise.reject(error)
     }
 
     return Promise.reject(error)
@@ -77,4 +77,3 @@ api.interceptors.response.use(
 )
 
 export default api
-

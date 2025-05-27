@@ -3,11 +3,19 @@
 import { useState } from "react"
 import { useSelector } from "react-redux"
 import { toast } from "react-toastify"
-import { FiStar, FiEdit, FiTrash2 } from "react-icons/fi"
+import { FiStar, FiEdit, FiTrash2, FiAlertCircle } from "react-icons/fi"
 import ReviewService from "../../services/review.service"
 import Spinner from "../ui/Spinner"
+import { Link } from "react-router-dom"
 
-const ReviewForm = ({ productId, onReviewSubmitted, userReview, canEdit = false }) => {
+const ReviewForm = ({
+  productId,
+  onReviewSubmitted,
+  userReview,
+  canEdit = false,
+  canReview = false,
+  productVariantDetails = null,
+}) => {
   const { isLoggedIn } = useSelector((state) => state.auth)
   const [rating, setRating] = useState(userReview ? userReview.rating : 5)
   const [comment, setComment] = useState(userReview ? userReview.comment : "")
@@ -51,7 +59,11 @@ const ReviewForm = ({ productId, onReviewSubmitted, userReview, canEdit = false 
         toast.success("Cập nhật đánh giá thành công")
       } else {
         // Tạo đánh giá mới
-        await ReviewService.createReview(productId, { rating, comment })
+        await ReviewService.createReview(productId, {
+          rating,
+          comment,
+          productVariantDetails,
+        })
         toast.success("Đánh giá sản phẩm thành công")
       }
 
@@ -99,7 +111,25 @@ const ReviewForm = ({ productId, onReviewSubmitted, userReview, canEdit = false 
   if (!isLoggedIn) {
     return (
       <div className="bg-gray-50 p-4 rounded-md text-center">
-        <p>Vui lòng đăng nhập để đánh giá sản phẩm</p>
+        <p className="mb-3">Vui lòng đăng nhập để đánh giá sản phẩm</p>
+        <Link to="/login" className="btn btn-primary">
+          Đăng nhập ngay
+        </Link>
+      </div>
+    )
+  }
+
+  if (!canReview && !userReview) {
+    return (
+      <div className="bg-gray-50 p-4 rounded-md">
+        <div className="flex items-center mb-2">
+          <FiAlertCircle className="text-primary mr-2" size={20} />
+          <h3 className="font-medium">Chưa thể đánh giá sản phẩm</h3>
+        </div>
+        <p className="text-gray-600">
+          Bạn cần mua sản phẩm này và hoàn tất đơn hàng trước khi có thể đánh giá. Sau khi đơn hàng được giao thành
+          công, bạn có thể quay lại đây để chia sẻ trải nghiệm của mình.
+        </p>
       </div>
     )
   }
@@ -146,6 +176,12 @@ const ReviewForm = ({ productId, onReviewSubmitted, userReview, canEdit = false 
           )}
         </div>
         <p className="text-gray-700">{userReview.comment}</p>
+
+        {userReview.product_variant_details && (
+          <div className="mt-2 text-sm text-gray-500 italic">
+            Phiên bản đã mua: {userReview.product_variant_details}
+          </div>
+        )}
       </div>
     )
   }
@@ -161,13 +197,15 @@ const ReviewForm = ({ productId, onReviewSubmitted, userReview, canEdit = false 
               <button
                 key={star}
                 type="button"
-                className="focus:outline-none"
+                className="focus:outline-none mr-1"
                 onClick={() => handleRatingChange(star)}
                 onMouseEnter={() => setHoveredRating(star)}
                 onMouseLeave={() => setHoveredRating(0)}
               >
                 <FiStar
-                  className={`${star <= (hoveredRating || rating) ? "text-yellow-400 fill-current" : "text-gray-300"}`}
+                  className={`${
+                    star <= (hoveredRating || rating) ? "text-yellow-400 fill-current" : "text-gray-300"
+                  } cursor-pointer`}
                   size={24}
                 />
               </button>
@@ -187,6 +225,15 @@ const ReviewForm = ({ productId, onReviewSubmitted, userReview, canEdit = false 
             placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..."
           ></textarea>
         </div>
+
+        {productVariantDetails && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-md">
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">Phiên bản sản phẩm:</span> {productVariantDetails}
+            </p>
+          </div>
+        )}
+
         <div className="flex space-x-2">
           <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
             {isSubmitting ? <Spinner size="sm" /> : userReview ? "Cập nhật" : "Gửi đánh giá"}

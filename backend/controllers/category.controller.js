@@ -1,14 +1,51 @@
 const Category = require("../models/category.model")
+const db = require("../config/db.config")
 
 // Lấy tất cả danh mục
 exports.getAllCategories = async (req, res, next) => {
   try {
-    const categories = await Category.findAll()
+    const page = Number.parseInt(req.query.page) || 1
+    const limit = Number.parseInt(req.query.limit) || 10
+    const offset = (page - 1) * limit
+    const search = req.query.search || ""
+
+    let query = `
+      SELECT c.*, COUNT(p.id) as product_count
+      FROM categories c
+      LEFT JOIN products p ON c.id = p.category_id
+      WHERE 1=1
+    `
+    let countQuery = `SELECT COUNT(*) as total FROM categories WHERE 1=1`
+    const queryParams = []
+    const countParams = []
+
+    // Search filter
+    if (search) {
+      query += ` AND c.name LIKE ?`
+      countQuery += ` AND name LIKE ?`
+      const searchParam = `%${search}%`
+      queryParams.push(searchParam)
+      countParams.push(searchParam)
+    }
+
+    query += ` GROUP BY c.id ORDER BY c.created_at DESC LIMIT ? OFFSET ?`
+    queryParams.push(limit, offset)
+
+    const [categories] = await db.query(query, queryParams)
+    const [countResult] = await db.query(countQuery, countParams)
+    const total = countResult[0].total
 
     res.json({
       status: "success",
       data: {
         categories,
+        total, // Thêm total vào data level
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
       },
     })
   } catch (error) {
@@ -144,4 +181,3 @@ exports.deleteCategory = async (req, res, next) => {
     next(error)
   }
 }
-

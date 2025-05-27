@@ -9,6 +9,7 @@ router.use(authenticate)
 
 // Routes for both admin and regular users
 router.get("/", orderController.getAllOrders)
+router.get("/user", orderController.getUserOrders) // Thêm route mới này
 router.get("/:id", orderController.getOrderById)
 router.post("/", orderRules, validate, orderController.createOrder)
 router.delete("/:id", orderController.deleteOrder) // Add this new route

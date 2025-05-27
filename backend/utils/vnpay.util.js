@@ -38,7 +38,7 @@ const VNPayUtil = {
     ipAddr = ipAddr || "127.0.0.1"
 
     // Create a unique transaction reference
-    const txnRef = `${orderId}${moment(date).format("HHmmss")}`
+    const txnRef = `${orderId}_${moment(date).format("HHmmss")}`
 
     // Ensure amount is a number and convert to VNPay format (amount * 100, no decimal)
     amount = Math.floor(Number.parseFloat(amount) * 100)

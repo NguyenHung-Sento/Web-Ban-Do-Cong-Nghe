@@ -2,12 +2,15 @@ const multer = require("multer")
 const path = require("path")
 const cloudinary = require("../config/cloudinary.config")
 const { CloudinaryStorage } = require("multer-storage-cloudinary")
+const dotenv = require("dotenv")
+
+dotenv.config()
 
 // Cấu hình lưu trữ Cloudinary
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: process.env.CLOUDINARY_FOLDER || "cellphones_clone",
+    folder: process.env.CLOUDINARY_FOLDER,
     allowed_formats: ["jpg", "jpeg", "png", "gif"],
     transformation: [{ width: 1000, height: 1000, crop: "limit" }],
   },

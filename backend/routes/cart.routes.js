@@ -13,5 +13,7 @@ router.put("/items/:itemId", cartItemRules, validate, cartController.updateItem)
 router.delete("/items/:itemId", cartController.removeItem)
 router.delete("/", cartController.clearCart)
 
-module.exports = router
+// Add new route for merging carts
+router.post("/merge", authenticate, cartController.mergeCart)
 
+module.exports = router

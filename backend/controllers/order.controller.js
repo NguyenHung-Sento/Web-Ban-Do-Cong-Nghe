@@ -2,13 +2,121 @@ const Order = require("../models/order.model")
 const Product = require("../models/product.model")
 const db = require("../config/db.config") // Import the database connection
 
-// Lấy tất cả đơn hàng (admin) hoặc đơn hàng của người dùng (khách hàng)
+// Lấy tất cả đơn hàng (chỉ admin)
 exports.getAllOrders = async (req, res, next) => {
   try {
-    // Nếu người dùng không phải admin, chỉ hiển thị đơn hàng của họ
-    const userId = req.user.role === "admin" ? null : req.user.id
+    // Chỉ admin mới có thể lấy tất cả đơn hàng
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        status: "error",
+        message: "Bạn không có quyền truy cập",
+      })
+    }
 
-    const orders = await Order.findAll(userId)
+    const page = Number.parseInt(req.query.page) || 1
+    const limit = Number.parseInt(req.query.limit) || 10
+    const offset = (page - 1) * limit
+    const search = req.query.search || ""
+    const status = req.query.status || ""
+    const payment_status = req.query.payment_status || ""
+    const start_date = req.query.start_date || ""
+    const end_date = req.query.end_date || ""
+
+    let query = `
+      SELECT o.*, u.name as user_name, u.email as user_email
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE 1=1
+    `
+    let countQuery = `
+      SELECT COUNT(*) as total 
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE 1=1
+    `
+    const queryParams = []
+    const countParams = []
+
+    // Search filter
+    if (search) {
+      query += ` AND (o.id LIKE ? OR u.name LIKE ? OR u.email LIKE ?)`
+      countQuery += ` AND (o.id LIKE ? OR u.name LIKE ? OR u.email LIKE ?)`
+      const searchParam = `%${search}%`
+      queryParams.push(searchParam, searchParam, searchParam)
+      countParams.push(searchParam, searchParam, searchParam)
+    }
+
+    // Status filter
+    if (status) {
+      query += ` AND o.status = ?`
+      countQuery += ` AND o.status = ?`
+      queryParams.push(status)
+      countParams.push(status)
+    }
+
+    // Payment status filter
+    if (payment_status) {
+      query += ` AND o.payment_status = ?`
+      countQuery += ` AND o.payment_status = ?`
+      queryParams.push(payment_status)
+      countParams.push(payment_status)
+    }
+
+    // Date range filter
+    if (start_date) {
+      query += ` AND DATE(o.created_at) >= ?`
+      countQuery += ` AND DATE(o.created_at) >= ?`
+      queryParams.push(start_date)
+      countParams.push(start_date)
+    }
+
+    if (end_date) {
+      query += ` AND DATE(o.created_at) <= ?`
+      countQuery += ` AND DATE(o.created_at) <= ?`
+      queryParams.push(end_date)
+      countParams.push(end_date)
+    }
+
+    query += ` ORDER BY o.created_at DESC LIMIT ? OFFSET ?`
+    queryParams.push(limit, offset)
+
+    const [orders] = await db.query(query, queryParams)
+    const [countResult] = await db.query(countQuery, countParams)
+    const total = countResult[0].total
+
+    // Get order items for each order
+    for (const order of orders) {
+      const [items] = await db.query(
+        `SELECT oi.*, p.name as product_name, p.image as product_image
+         FROM order_items oi
+         LEFT JOIN products p ON oi.product_id = p.id
+         WHERE oi.order_id = ?`,
+        [order.id],
+      )
+      order.items = items
+    }
+
+    res.json({
+      status: "success",
+      data: {
+        orders,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// Lấy đơn hàng của người dùng hiện tại
+exports.getUserOrders = async (req, res, next) => {
+  try {
+    const orders = await Order.findAll(req.user.id)
 
     res.json({
       status: "success",

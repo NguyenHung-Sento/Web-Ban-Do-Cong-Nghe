@@ -31,6 +31,7 @@ const CreditCardPayment = ({ orderId, amount, onPaymentProcessed, paymentProcess
         .required("Mã CVV là bắt buộc")
         .matches(/^[0-9]{3,4}$/, "Mã CVV phải có 3 hoặc 4 chữ số"),
     }),
+    validateOnMount: true, 
     onSubmit: async (values) => {
       // Prevent multiple submissions
       if (loading || paymentProcessingStarted) return
@@ -255,7 +256,7 @@ const CreditCardPayment = ({ orderId, amount, onPaymentProcessed, paymentProcess
         <button
           type="submit"
           className="w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary-dark transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
-          disabled={loading}
+          disabled={loading || !formik.isValid || !formik.dirty}
         >
           {loading ? <Spinner size="sm" /> : "Thanh toán ngay"}
         </button>

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import { FiRefreshCw, FiCheck, FiExternalLink } from "react-icons/fi"
 import PaymentService from "../../services/payment.service"
 import Spinner from "../ui/Spinner"
+import { toast } from "react-toastify"
 
 const VNPayPayment = ({ orderId, amount, onPaymentProcessed, ...props }) => {
   const navigate = useNavigate()
@@ -15,17 +16,16 @@ const VNPayPayment = ({ orderId, amount, onPaymentProcessed, ...props }) => {
   const [checkingStatus, setCheckingStatus] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState("pending")
   const [paymentProcessed, setPaymentProcessed] = useState(false)
+  const [paymentId, setPaymentId] = useState(null)
 
   useEffect(() => {
     const processPayment = async () => {
-      // If payment processing has already started, don't process again
       if (props.paymentProcessingStarted || paymentProcessed) return
 
       try {
         setLoading(true)
         console.log("Processing VNPay payment for order:", orderId, "Amount:", amount)
 
-        // Validate amount before sending
         if (!amount || isNaN(Number.parseFloat(amount)) || Number.parseFloat(amount) <= 0) {
           throw new Error("Invalid amount for payment")
         }
@@ -40,14 +40,18 @@ const VNPayPayment = ({ orderId, amount, onPaymentProcessed, ...props }) => {
         if (response.data && response.data.pay_url) {
           setPayUrl(response.data.pay_url)
           setTransactionId(response.data.transaction_id || "")
+          setPaymentId(response.data.payment_id)
           onPaymentProcessed(response.data.payment_id)
           setPaymentProcessed(true)
+          toast.success("Đã tạo liên kết thanh toán VNPay!")
         } else {
           throw new Error("Invalid response format from payment service")
         }
       } catch (error) {
         console.error("VNPay payment error:", error)
-        setError(error.response?.data?.message || "Không thể xử lý thanh toán. Vui lòng thử lại sau.")
+        const errorMessage = error.response?.data?.message || "Không thể xử lý thanh toán. Vui lòng thử lại sau."
+        setError(errorMessage)
+        toast.error(errorMessage)
       } finally {
         setLoading(false)
       }
@@ -56,34 +60,26 @@ const VNPayPayment = ({ orderId, amount, onPaymentProcessed, ...props }) => {
     processPayment()
   }, [orderId, amount, onPaymentProcessed, props.paymentProcessingStarted, paymentProcessed])
 
-  // Thêm hàm kiểm tra trạng thái thanh toán tự động
+  // Auto-check payment status every 5 seconds
   useEffect(() => {
-    // Kiểm tra trạng thái thanh toán khi component được tải
-    if (orderId) {
-      checkPaymentStatus()
-
-      // Thiết lập kiểm tra trạng thái thanh toán mỗi 5 giây
-      const intervalId = setInterval(() => {
+    if (orderId && paymentStatus !== "paid") {
+      const interval = setInterval(() => {
         checkPaymentStatus()
       }, 5000)
 
-      // Xóa interval khi component unmount
-      return () => clearInterval(intervalId)
+      return () => clearInterval(interval)
     }
-  }, [orderId])
+  }, [orderId, paymentStatus])
 
-  // Sửa hàm checkPaymentStatus để cập nhật trạng thái và gọi onPaymentProcessed
   const checkPaymentStatus = async () => {
     try {
       setCheckingStatus(true)
       const response = await PaymentService.checkPaymentStatus(orderId)
 
-      // Cập nhật trạng thái thanh toán
       setPaymentStatus(response.data.payment_status)
 
-      // Nếu thanh toán đã hoàn tất, gọi onPaymentProcessed
       if (response.data.payment_status === "paid") {
-        // Tìm payment_id từ danh sách payments
+        toast.success("Thanh toán VNPay thành công!")
         if (response.data.payments && response.data.payments.length > 0) {
           onPaymentProcessed(response.data.payments[0].id)
         }
@@ -97,16 +93,21 @@ const VNPayPayment = ({ orderId, amount, onPaymentProcessed, ...props }) => {
 
   const handleOpenPaymentPage = () => {
     if (!payUrl) {
-      setError("Không thể mở trang thanh toán. URL thanh toán không hợp lệ.")
+      const errorMsg = "Không thể mở trang thanh toán. URL thanh toán không hợp lệ."
+      setError(errorMsg)
+      toast.error(errorMsg)
       return
     }
 
     try {
       console.log("Opening VNPay payment URL:", payUrl)
       window.open(payUrl, "_blank")
+      toast.info("Đã mở trang thanh toán VNPay. Vui lòng hoàn tất thanh toán.")
     } catch (error) {
       console.error("Error opening payment page:", error)
-      setError("Không thể mở trang thanh toán. Vui lòng kiểm tra cài đặt trình duyệt của bạn.")
+      const errorMsg = "Không thể mở trang thanh toán. Vui lòng kiểm tra cài đặt trình duyệt của bạn."
+      setError(errorMsg)
+      toast.error(errorMsg)
     }
   }
 
@@ -131,7 +132,7 @@ const VNPayPayment = ({ orderId, amount, onPaymentProcessed, ...props }) => {
           </div>
           <h3 className="text-xl font-bold mb-2">Thanh toán thành công!</h3>
           <p className="text-gray-600 mb-4">
-            Thanh toán của bạn đã được xử lý thành công. Đơn hàng của bạn sẽ được giao trong thời gian sớm nhất.
+            Thanh toán VNPay của bạn đã được xử lý thành công. Đơn hàng của bạn sẽ được giao trong thời gian sớm nhất.
           </p>
         </div>
       </div>
@@ -166,8 +167,8 @@ const VNPayPayment = ({ orderId, amount, onPaymentProcessed, ...props }) => {
             <li>Nhấn vào nút "Mở trang thanh toán VNPay" ở trên</li>
             <li>Chọn phương thức thanh toán trên trang VNPay</li>
             <li>Hoàn thành thanh toán theo hướng dẫn</li>
-            <li>Sau khi thanh toán xong, quay lại trang này</li>
-            <li>Nhấn nút "Kiểm tra trạng thái thanh toán" để cập nhật trạng thái</li>
+            <li>Hệ thống sẽ tự động cập nhật trạng thái thanh toán</li>
+            <li>Hoặc nhấn nút "Kiểm tra trạng thái thanh toán" để cập nhật thủ công</li>
           </ol>
         </div>
 
@@ -186,7 +187,11 @@ const VNPayPayment = ({ orderId, amount, onPaymentProcessed, ...props }) => {
         </button>
       </div>
 
-      <div className="text-center text-sm text-gray-500">Mã giao dịch: {transactionId}</div>
+      <div className="text-center text-sm text-gray-500">
+        Mã giao dịch: {transactionId}
+        <br />
+        <span className="text-xs">Hệ thống tự động kiểm tra trạng thái mỗi 5 giây</span>
+      </div>
     </div>
   )
 }

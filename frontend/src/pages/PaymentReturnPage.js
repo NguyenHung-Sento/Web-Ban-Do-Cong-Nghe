@@ -45,8 +45,8 @@ const PaymentReturnPage = () => {
           // Process VNPay return
           const vnp_ResponseCode = params.get("vnp_ResponseCode")
           const vnp_TxnRef = params.get("vnp_TxnRef")
-          const orderId = vnp_TxnRef.split("_")[0] // Extract order ID from VNPay transaction reference
-
+          const orderId = params.get("order_id")
+          
           if (vnp_ResponseCode === "00") {
             setSuccess(true)
             setMessage("Thanh toán thành công! Cảm ơn bạn đã mua hàng.")

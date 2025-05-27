@@ -23,17 +23,17 @@ const EmailService = {
    */
   sendVerificationEmail: async (to, otp) => {
     const mailOptions = {
-      from: `"CellPhoneS" <${process.env.EMAIL_USER}>`,
+      from: `"DigitalW" <${process.env.EMAIL_USER}>`,
       to,
-      subject: "Xác thực tài khoản CellPhoneS",
+      subject: "Xác thực tài khoản DigitalW",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
           <div style="text-align: center; margin-bottom: 20px;">
-            <h1 style="color: #D70018;">CellPhoneS</h1>
+            <h1 style="color: #D70018;">DigitalW</h1>
           </div>
           <div style="margin-bottom: 20px;">
             <p>Xin chào,</p>
-            <p>Cảm ơn bạn đã đăng ký tài khoản tại CellPhoneS. Để hoàn tất quá trình đăng ký, vui lòng nhập mã OTP sau đây:</p>
+            <p>Cảm ơn bạn đã đăng ký tài khoản tại DigitalW. Để hoàn tất quá trình đăng ký, vui lòng nhập mã OTP sau đây:</p>
             <div style="text-align: center; margin: 30px 0;">
               <div style="font-size: 24px; font-weight: bold; letter-spacing: 5px; padding: 10px; background-color: #f5f5f5; border-radius: 5px;">${otp}</div>
             </div>
@@ -42,7 +42,7 @@ const EmailService = {
           </div>
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 12px;">
             <p>Email này được gửi tự động, vui lòng không trả lời.</p>
-            <p>&copy; ${new Date().getFullYear()} CellPhoneS. Tất cả quyền được bảo lưu.</p>
+            <p>&copy; ${new Date().getFullYear()} DigitalW. Tất cả quyền được bảo lưu.</p>
           </div>
         </div>
       `,

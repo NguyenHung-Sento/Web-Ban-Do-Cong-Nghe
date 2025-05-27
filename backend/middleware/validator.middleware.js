@@ -57,3 +57,44 @@ exports.orderRules = [
 exports.cartItemRules = [
   body("quantity").isInt({ min: 1 }).withMessage("Số lượng phải ít nhất là 1"),
 ]
+
+exports.bannerRules = [
+  body("title")
+    .notEmpty()
+    .withMessage("Tiêu đề banner là bắt buộc")
+    .isLength({ max: 255 })
+    .withMessage("Tiêu đề không được vượt quá 255 ký tự"),
+
+  body("subtitle")
+    .optional({ checkFalsy: true })
+    .isLength({ max: 255 })
+    .withMessage("Phụ đề không được vượt quá 255 ký tự"),
+
+  body("description")
+    .optional({ checkFalsy: true })
+    .isLength({ max: 1000 })
+    .withMessage("Mô tả không được vượt quá 1000 ký tự"),
+
+  body("button_text")
+    .optional({ checkFalsy: true })
+    .isLength({ max: 50 })
+    .withMessage("Văn bản nút không được vượt quá 50 ký tự"),
+
+  body("position").optional({ checkFalsy: true }).isInt({ min: 0 }).withMessage("Vị trí phải là số nguyên không âm"),
+
+  body("is_active")
+    .optional()
+    .custom((value) => {
+      // Accept boolean, string 'true'/'false', or numbers 0/1
+      if (typeof value === "boolean") return true
+      if (typeof value === "string" && (value === "true" || value === "false")) return true
+      if (typeof value === "number" && (value === 0 || value === 1)) return true
+      throw new Error("Trạng thái phải là true hoặc false")
+    }),
+
+  body("image_url")
+    .notEmpty()
+    .withMessage("Link hình ảnh banner là bắt buộc")
+    .isURL()
+    .withMessage("Link hình ảnh phải là URL hợp lệ"),
+]

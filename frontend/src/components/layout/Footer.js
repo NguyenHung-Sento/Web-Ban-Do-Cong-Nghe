@@ -8,9 +8,9 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* About */}
           <div>
-            <h3 className="text-xl font-bold mb-4">CellPhoneS</h3>
+            <h3 className="text-xl font-bold mb-4">DigitalW</h3>
             <p className="text-gray-400 mb-4">
-              CellPhoneS - Hệ thống bán lẻ điện thoại, máy tính, thiết bị công nghệ chính hãng với hơn 100 cửa hàng trên
+              DigitalW - Hệ thống bán lẻ điện thoại, máy tính, thiết bị công nghệ chính hãng với hơn 100 cửa hàng trên
               toàn quốc.
             </p>
             <div className="flex space-x-4">
@@ -109,7 +109,7 @@ const Footer = () => {
               </li>
               <li className="flex items-center">
                 <FiMail className="mr-3 text-primary" size={18} />
-                <span className="text-gray-400">info@cellphones.com</span>
+                <span className="text-gray-400">info@digitalw.com</span>
               </li>
             </ul>
           </div>
@@ -118,12 +118,12 @@ const Footer = () => {
         <div className="border-t border-gray-800 mt-10 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm mb-4 md:mb-0">
-              &copy; {new Date().getFullYear()} CellPhoneS. Tất cả quyền được bảo lưu.
+              &copy; {new Date().getFullYear()} DigitalW. Tất cả quyền được bảo lưu.
             </p>
             <div className="flex space-x-4">
               <img src="/images/payment-visa.png" alt="Visa" className="h-8" />
               <img src="/images/payment-mastercard.png" alt="Mastercard" className="h-8" />
-              <img src="/images/payment-paypal.png" alt="PayPal" className="h-8" />
+              <img src="/images/payment-vnpay.png" alt="VNPay" className="h-8" />
               <img src="/images/payment-momo.png" alt="MoMo" className="h-8" />
             </div>
           </div>

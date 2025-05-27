@@ -1,47 +1,45 @@
 "use client"
 import { useState, useEffect } from "react"
-import { Link } from "react-router-dom"
-import { useDispatch, useSelector } from "react-redux"
+import { Link, useNavigate } from "react-router-dom"
+import { useDispatch } from "react-redux"
 import { FiShoppingCart } from "react-icons/fi"
 import { addToCart } from "../../features/cart/cartSlice"
 import Rating from "./Rating"
 import ReviewService from "../../services/review.service"
 import { toast } from "react-toastify"
 import Spinner from "./Spinner"
-import { useLoginPrompt } from "../../contexts/LoginPromptContext"
-
 
 const ProductCard = ({ product }) => {
   const dispatch = useDispatch()
-  const { isLoggedIn } = useSelector((state) => state.auth)
+  const navigate = useNavigate()
   const [rating, setRating] = useState(0)
   const [reviewCount, setReviewCount] = useState(0)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
-  const { showLoginPrompt } = useLoginPrompt()
 
   useEffect(() => {
-    // Lấy thông tin đánh giá cho sản phẩm
-    const fetchRating = async () => {
-      try {
-        const response = await ReviewService.getProductReviews(product.id, { limit: 1 })
-        if (response.data && response.data.stats) {
-          setRating(Number.parseFloat(response.data.stats.average_rating) || 0)
-          setReviewCount(response.data.pagination.total || 0)
+    // Sử dụng rating và review_count từ product nếu có
+    if (product.rating !== undefined && product.review_count !== undefined) {
+      setRating(Number.parseFloat(product.rating) || 0)
+      setReviewCount(product.review_count || 0)
+    } else {
+      // Nếu không có, lấy thông tin đánh giá cho sản phẩm từ API
+      const fetchRating = async () => {
+        try {
+          const response = await ReviewService.getProductReviews(product.id, { limit: 1 })
+          if (response.data && response.data.stats) {
+            setRating(Number.parseFloat(response.data.stats.average_rating) || 0)
+            setReviewCount(response.data.pagination.total || 0)
+          }
+        } catch (error) {
+          console.error("Error fetching product rating:", error)
         }
-      } catch (error) {
-        console.error("Error fetching product rating:", error)
       }
-    }
 
-    fetchRating()
-  }, [product.id])
+      fetchRating()
+    }
+  }, [product])
 
   const handleAddToCart = async () => {
-    if (!isLoggedIn) {
-      // Use the global login prompt
-      showLoginPrompt(`/product/${product.slug}`)
-      return
-    }
     // Kiểm tra tồn kho
     if (product.stock <= 0) {
       toast.error("Sản phẩm đã hết hàng")
@@ -51,7 +49,19 @@ const ProductCard = ({ product }) => {
     setIsAddingToCart(true)
 
     try {
-      await dispatch(addToCart({ productId: product.id, quantity: 1 }))
+      await dispatch(
+        addToCart({
+          productId: product.id,
+          quantity: 1,
+          product: {
+            name: product.name,
+            price: product.price,
+            sale_price: product.sale_price,
+            image: product.image,
+            stock: product.stock,
+          },
+        }),
+      )
       // Thông báo thành công ở đây, đã loại bỏ ở cartSlice
       toast.success("Đã thêm sản phẩm vào giỏ hàng")
     } catch (error) {
@@ -93,22 +103,24 @@ const ProductCard = ({ product }) => {
             )}
           </div>
         </Link>
-        <button
-          onClick={handleAddToCart}
-          className={`w-full btn flex items-center justify-center ${
-            product.stock > 0 ? "btn-primary" : "btn-disabled bg-gray-300 cursor-not-allowed"
-          }`}
-          disabled={product.stock <= 0 || isAddingToCart}
-        >
-          {isAddingToCart ? (
-            <Spinner size="sm" />
-          ) : (
-            <>
-              <FiShoppingCart className="mr-2" />
-              {product.stock > 0 ? "Thêm vào giỏ" : "Hết hàng"}
-            </>
-          )}
-        </button>
+        <div>
+          <button
+            onClick={handleAddToCart}
+            className={`w-full btn flex items-center justify-center ${
+              product.stock > 0 ? "btn-primary" : "btn-disabled bg-gray-300 cursor-not-allowed"
+            }`}
+            disabled={product.stock <= 0 || isAddingToCart}
+          >
+            {isAddingToCart ? (
+              <Spinner size="sm" />
+            ) : (
+              <>
+                <FiShoppingCart className="mr-2" />
+                Thêm vào giỏ
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )

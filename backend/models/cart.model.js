@@ -1,6 +1,27 @@
 const db = require("../config/db.config")
 const Product = require("./product.model")
 
+// Helper function to normalize options for comparison
+const normalizeOptions = (options) => {
+  if (!options) return null
+
+  // If it's a string, parse it
+  const optionsObj = typeof options === "string" ? JSON.parse(options) : options
+
+  // Sort keys to ensure consistent comparison regardless of property order
+  const sortedObj = {}
+  Object.keys(optionsObj)
+    .sort()
+    .forEach((key) => {
+      // Skip metadata properties that shouldn't affect variant matching
+      if (!["variantPrice", "variantImage"].includes(key)) {
+        sortedObj[key] = optionsObj[key]
+      }
+    })
+
+  return JSON.stringify(sortedObj)
+}
+
 const Cart = {
   findByUserId: async (userId) => {
     // Kiểm tra xem giỏ hàng đã tồn tại chưa
@@ -101,39 +122,58 @@ const Cart = {
       cartId = cartRows[0].id
     }
 
-    // Check if product already in cart with the same options
-    let query = `SELECT * FROM cart_items WHERE cart_id = ? AND product_id = ?`
-    const queryParams = [cartId, productId]
+    // Normalize options for comparison
+    const normalizedOptions = normalizeOptions(options)
 
-    if (options) {
-      query += ` AND options = ?`
-      queryParams.push(typeof options === "string" ? options : JSON.stringify(options))
-    } else {
-      query += ` AND (options IS NULL OR options = '{}' OR options = '')`
-    }
+    // Lấy tất cả các item hiện có trong giỏ hàng với cùng product_id
+    const [existingItems] = await db.query(`SELECT * FROM cart_items WHERE cart_id = ? AND product_id = ?`, [
+      cartId,
+      productId,
+    ])
 
-    const [existingItems] = await db.query(query, queryParams)
+    // Tìm item có cùng options (nếu có)
+    let existingItem = null
 
     if (existingItems.length > 0) {
+      for (const item of existingItems) {
+        // Nếu cả hai đều không có options
+        if (!options && (!item.options || item.options === "{}" || item.options === "")) {
+          existingItem = item
+          break
+        }
+
+        // Nếu cả hai đều có options, so sánh chuỗi JSON đã chuẩn hóa
+        if (options && item.options) {
+          try {
+            const itemNormalizedOptions = normalizeOptions(item.options)
+
+            if (normalizedOptions === itemNormalizedOptions) {
+              existingItem = item
+              break
+            }
+          } catch (e) {
+            console.error("Error comparing options:", e)
+          }
+        }
+      }
+    }
+
+    if (existingItem) {
       // Update quantity
-      await db.query(`UPDATE cart_items SET quantity = quantity + ? WHERE id = ?`, [quantity, existingItems[0].id])
+      await db.query(`UPDATE cart_items SET quantity = quantity + ? WHERE id = ?`, [quantity, existingItem.id])
     } else {
-      // Add new item - Kiểm tra cấu trúc bảng cart_items
-      // Thêm cả variant_image nếu có
+      // Add new item
       let insertQuery, insertParams
 
-      if (options && variantImage) {
+      // Prepare options for storage - keep the original format but ensure it's a string
+      const optionsToStore = options ? (typeof options === "string" ? options : JSON.stringify(options)) : null
+
+      if (optionsToStore && variantImage) {
         insertQuery = `INSERT INTO cart_items (cart_id, product_id, quantity, options, variant_image) VALUES (?, ?, ?, ?, ?)`
-        insertParams = [
-          cartId,
-          productId,
-          quantity,
-          typeof options === "string" ? options : JSON.stringify(options),
-          variantImage,
-        ]
-      } else if (options) {
+        insertParams = [cartId, productId, quantity, optionsToStore, variantImage]
+      } else if (optionsToStore) {
         insertQuery = `INSERT INTO cart_items (cart_id, product_id, quantity, options) VALUES (?, ?, ?, ?)`
-        insertParams = [cartId, productId, quantity, typeof options === "string" ? options : JSON.stringify(options)]
+        insertParams = [cartId, productId, quantity, optionsToStore]
       } else if (variantImage) {
         insertQuery = `INSERT INTO cart_items (cart_id, product_id, quantity, variant_image) VALUES (?, ?, ?, ?)`
         insertParams = [cartId, productId, quantity, variantImage]

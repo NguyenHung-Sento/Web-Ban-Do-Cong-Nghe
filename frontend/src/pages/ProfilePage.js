@@ -8,7 +8,9 @@ import * as Yup from "yup"
 import { getProfile, updateProfile, changePassword } from "../features/auth/authSlice"
 import Layout from "../components/layout/Layout"
 import Spinner from "../components/ui/Spinner"
-import { FiUser, FiMail, FiPhone, FiMapPin, FiLock, FiEye, FiEyeOff } from "react-icons/fi"
+import { FiUser, FiMail, FiPhone, FiLock, FiEye, FiEyeOff } from "react-icons/fi"
+// Thêm import cho AddressManager
+import AddressManager from "../components/address/AddressManager"
 
 const ProfilePage = () => {
   const dispatch = useDispatch()
@@ -33,7 +35,6 @@ const ProfilePage = () => {
     initialValues: {
       name: user?.name || "",
       phone: user?.phone || "",
-      address: user?.address || "",
     },
     enableReinitialize: true,
     validationSchema: Yup.object({
@@ -41,7 +42,6 @@ const ProfilePage = () => {
       phone: Yup.string()
         .matches(/^[0-9]{10,11}$/, "Số điện thoại không hợp lệ")
         .required("Số điện thoại là bắt buộc"),
-      address: Yup.string().required("Địa chỉ là bắt buộc"),
     }),
     onSubmit: (values) => {
       dispatch(updateProfile(values))
@@ -117,6 +117,17 @@ const ProfilePage = () => {
                       onClick={() => setActiveTab("password")}
                     >
                       Đổi mật khẩu
+                    </button>
+                  </li>
+                  {/* Thêm tab mới cho địa chỉ trong sidebar */}
+                  <li>
+                    <button
+                      className={`w-full text-left px-4 py-2 rounded-md ${
+                        activeTab === "addresses" ? "bg-primary text-white" : "hover:bg-gray-light"
+                      }`}
+                      onClick={() => setActiveTab("addresses")}
+                    >
+                      Địa chỉ của tôi
                     </button>
                   </li>
                 </ul>
@@ -201,29 +212,6 @@ const ProfilePage = () => {
                           </div>
                           {profileFormik.touched.phone && profileFormik.errors.phone && (
                             <div className="form-error">{profileFormik.errors.phone}</div>
-                          )}
-                        </div>
-
-                        <div className="mb-6">
-                          <label htmlFor="address" className="form-label">
-                            Địa chỉ
-                          </label>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                              <FiMapPin className="text-gray-dark" />
-                            </div>
-                            <input
-                              type="text"
-                              id="address"
-                              name="address"
-                              className={`form-input pl-10 ${
-                                profileFormik.touched.address && profileFormik.errors.address ? "border-red-500" : ""
-                              }`}
-                              {...profileFormik.getFieldProps("address")}
-                            />
-                          </div>
-                          {profileFormik.touched.address && profileFormik.errors.address && (
-                            <div className="form-error">{profileFormik.errors.address}</div>
                           )}
                         </div>
 
@@ -353,6 +341,12 @@ const ProfilePage = () => {
                       </form>
                     </>
                   )}
+                  {/* Thêm nội dung tab địa chỉ trong main content */}
+                  {activeTab === "addresses" && (
+                    <>
+                      <AddressManager />
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -364,4 +358,3 @@ const ProfilePage = () => {
 }
 
 export default ProfilePage
-

@@ -1,9 +1,23 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
 import AuthService from "../../services/auth.service"
+import CartService from "../../services/cart.service"
+import { fetchCart } from "../cart/cartSlice"
 import { toast } from "react-toastify"
 
-// Lấy thông tin người dùng từ localStorage
-const user = JSON.parse(localStorage.getItem("user"))
+// Helper function to get guest cart from localStorage
+const getGuestCartItems = () => {
+  const guestCart = localStorage.getItem("guestCart")
+  if (guestCart) {
+    try {
+      const parsedCart = JSON.parse(guestCart)
+      return parsedCart.items || []
+    } catch (error) {
+      console.error("Error parsing guest cart:", error)
+      return []
+    }
+  }
+  return []
+}
 
 // Async thunk actions
 export const register = createAsyncThunk("auth/register", async (userData, { rejectWithValue }) => {
@@ -18,13 +32,77 @@ export const register = createAsyncThunk("auth/register", async (userData, { rej
   }
 })
 
-export const login = createAsyncThunk("auth/login", async (credentials, { rejectWithValue }) => {
+export const login = createAsyncThunk("auth/login", async (userData, { dispatch, rejectWithValue }) => {
   try {
-    const response = await AuthService.login(credentials)
+    const response = await AuthService.login(userData)
+
+    // After successful login, check if there's a guest cart
+    const guestCartItems = getGuestCartItems()
+
+    if (guestCartItems.length > 0) {
+      try {
+        // Merge guest cart with user cart
+        await CartService.mergeCart(guestCartItems)
+
+        // Clear guest cart from localStorage
+        localStorage.removeItem("guestCart")
+
+        // Fetch the updated cart
+        dispatch(fetchCart())
+
+        toast.success("Giỏ hàng của bạn đã được cập nhật")
+      } catch (error) {
+        console.error("Error merging carts:", error)
+        // Still continue with login even if cart merging fails
+      }
+    } else {
+      // If no guest cart, just fetch the user's cart
+      dispatch(fetchCart())
+    }
+
     toast.success("Đăng nhập thành công!")
     return response.data
   } catch (error) {
     const message = error.response?.data?.message || "Đăng nhập thất bại"
+    toast.error(message)
+    return rejectWithValue(message)
+  }
+})
+
+export const socialLogin = createAsyncThunk("auth/socialLogin", async (userData, { dispatch, rejectWithValue }) => {
+  try {
+    // Process the social login data
+    const { token, userId } = userData
+    const response = await AuthService.processSocialLoginCallback(token, userId)
+
+    // After successful login, check if there's a guest cart
+    const guestCartItems = getGuestCartItems()
+
+    if (guestCartItems.length > 0) {
+      try {
+        // Merge guest cart with user cart
+        await CartService.mergeCart(guestCartItems)
+
+        // Clear guest cart from localStorage
+        localStorage.removeItem("guestCart")
+
+        // Fetch the updated cart
+        dispatch(fetchCart())
+
+        toast.success("Giỏ hàng của bạn đã được cập nhật")
+      } catch (error) {
+        console.error("Error merging carts:", error)
+        // Still continue with login even if cart merging fails
+      }
+    } else {
+      // If no guest cart, just fetch the user's cart
+      dispatch(fetchCart())
+    }
+
+    toast.success("Đăng nhập thành công!")
+    return response.data
+  } catch (error) {
+    const message = error.response?.data?.message || "Đăng nhập bằng mạng xã hội thất bại"
     toast.error(message)
     return rejectWithValue(message)
   }
@@ -79,23 +157,56 @@ export const changePassword = createAsyncThunk("auth/changePassword", async (pas
   }
 })
 
+// Get initial state from localStorage
+const getInitialState = () => {
+  try {
+    const user = localStorage.getItem("user")
+    const token = localStorage.getItem("token")
+    return {
+      user: user ? JSON.parse(user) : null,
+      isLoggedIn: !!(user && token),
+      isLoading: false,
+      error: null,
+      registrationData: null,
+      tokenRefreshing: false,
+    }
+  } catch (error) {
+    console.error("Error parsing user from localStorage:", error)
+    // Clear potentially corrupted data
+    localStorage.removeItem("user")
+    localStorage.removeItem("token")
+    return {
+      user: null,
+      isLoggedIn: false,
+      isLoading: false,
+      error: null,
+      registrationData: null,
+      tokenRefreshing: false,
+    }
+  }
+}
+
 // Slice
 const authSlice = createSlice({
   name: "auth",
-  initialState: {
-    user: user || null,
-    isLoggedIn: !!user,
-    isLoading: false,
-    error: null,
-    registrationData: null,
-    tokenRefreshing: false,
-  },
+  initialState: getInitialState(),
   reducers: {
     resetError: (state) => {
       state.error = null
     },
     resetRegistrationData: (state) => {
       state.registrationData = null
+    },
+    // Add a manual login action for direct state updates
+    setCredentials: (state, action) => {
+      const { user, token } = action.payload
+      state.user = user
+      state.isLoggedIn = true
+      // Update localStorage
+      localStorage.setItem("user", JSON.stringify(user))
+      if (token) {
+        localStorage.setItem("token", token)
+      }
     },
   },
   extraReducers: (builder) => {
@@ -122,9 +233,27 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false
         state.isLoggedIn = true
-        state.user = action.payload.user
+        if (action.payload && action.payload.user) {
+          state.user = action.payload.user
+        }
       })
       .addCase(login.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+      // Social Login
+      .addCase(socialLogin.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(socialLogin.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.isLoggedIn = true
+        if (action.payload && action.payload.user) {
+          state.user = action.payload.user
+        }
+      })
+      .addCase(socialLogin.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload
       })
@@ -152,7 +281,11 @@ const authSlice = createSlice({
       })
       .addCase(getProfile.fulfilled, (state, action) => {
         state.isLoading = false
-        state.user = action.payload.user
+        if (action.payload && action.payload.data && action.payload.data.user) {
+          state.user = action.payload.data.user
+          // Update user in localStorage
+          localStorage.setItem("user", JSON.stringify(action.payload.data.user))
+        }
       })
       .addCase(getProfile.rejected, (state, action) => {
         state.isLoading = false
@@ -163,8 +296,14 @@ const authSlice = createSlice({
         state.isLoading = true
         state.error = null
       })
-      .addCase(updateProfile.fulfilled, (state) => {
+      .addCase(updateProfile.fulfilled, (state, action) => {
         state.isLoading = false
+        // Cập nhật thông tin user trong state
+        if (action.payload && action.payload.user) {
+          state.user = action.payload.user
+          // Cập nhật localStorage với thông tin user mới
+          localStorage.setItem("user", JSON.stringify(action.payload.user))
+        }
       })
       .addCase(updateProfile.rejected, (state, action) => {
         state.isLoading = false
@@ -185,7 +324,6 @@ const authSlice = createSlice({
   },
 })
 
-export const { resetError, resetRegistrationData } = authSlice.actions
+export const { resetError, resetRegistrationData, setCredentials } = authSlice.actions
 
 export default authSlice.reducer
-

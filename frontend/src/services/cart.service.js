@@ -18,13 +18,8 @@ const CartService = {
   },
 
   updateItem: async (itemId, quantity) => {
-    try {
-      const response = await api.put(`/cart/items/${itemId}`, { quantity })
-      return response.data
-    } catch (error) {
-      console.error("Update Item Error:", error.response?.data || error.message)
-      throw error
-    }
+    const response = await api.put(`/cart/items/${itemId}`, { quantity })
+    return response.data
   },
 
   removeItem: async (itemId) => {
@@ -36,7 +31,11 @@ const CartService = {
     const response = await api.delete("/cart")
     return response.data
   },
+
+  // Add a new method to merge guest cart with user cart
+  mergeCart: (guestCartItems) => {
+    return api.post("/cart/merge", { items: guestCartItems })
+  },
 }
 
 export default CartService
-

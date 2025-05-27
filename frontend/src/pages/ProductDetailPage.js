@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
-import { useParams, Link } from "react-router-dom"
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom"
 import { useDispatch, useSelector } from "react-redux"
 import Layout from "../components/layout/Layout"
 import Spinner from "../components/ui/Spinner"
@@ -18,24 +18,39 @@ import { toast } from "react-toastify"
 const ProductDetailPage = () => {
   const { slug } = useParams()
   const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const location = useLocation()
   const { showLoginPrompt } = useLoginPrompt()
+
+  // Kiểm tra xem URL có chứa tham số review=true không
+  const shouldShowReviewTab = location.search.includes("review=true")
 
   const { product, relatedProducts, isLoading, error } = useSelector((state) => state.products)
   const { isLoggedIn } = useSelector((state) => state.auth)
 
   const [quantity, setQuantity] = useState(1)
-  const [activeTab, setActiveTab] = useState("description")
+  const [activeTab, setActiveTab] = useState(shouldShowReviewTab ? "reviews" : "description")
   const [activeImage, setActiveImage] = useState(0)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
-
-  // Thêm state cho các tùy chọn sản phẩm
   const [selectedColor, setSelectedColor] = useState("")
   const [selectedStorage, setSelectedStorage] = useState("")
   const [selectedConfig, setSelectedConfig] = useState("")
 
   useEffect(() => {
     dispatch(fetchProductBySlug(slug))
-  }, [dispatch, slug])
+
+    // Nếu có tham số review=true, chuyển đến tab đánh giá
+    if (shouldShowReviewTab) {
+      setActiveTab("reviews")
+      // Đợi một chút để đảm bảo DOM đã được render
+      setTimeout(() => {
+        const reviewsSection = document.getElementById("reviews-tab")
+        if (reviewsSection) {
+          reviewsSection.scrollIntoView({ behavior: "smooth" })
+        }
+      }, 500)
+    }
+  }, [dispatch, slug, shouldShowReviewTab])
 
   useEffect(() => {
     if (product) {
@@ -73,7 +88,7 @@ const ProductDetailPage = () => {
     const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants
 
     // Xử lý cho sản phẩm điện thoại (có màu sắc và dung lượng)
-    if (product.product_type === "phone") {
+    if (variants.colors || variants.storage) {
       // Tìm giá dựa trên dung lượng đã chọn
       let variantPrice = product.sale_price || product.price
       if (variants.storage) {
@@ -119,7 +134,7 @@ const ProductDetailPage = () => {
     }
 
     // Xử lý cho sản phẩm laptop (có cấu hình)
-    else if (product.product_type === "laptop" && variants.configs) {
+    else if (variants.configs) {
       const selectedConfigOption = variants.configs.find((c) => c.value === selectedConfig)
 
       // Kiểm tra tồn kho từ product_variants nếu có
@@ -159,12 +174,6 @@ const ProductDetailPage = () => {
   }
 
   const handleAddToCart = async () => {
-    if (!isLoggedIn) {
-      // Use the global login prompt
-      showLoginPrompt(`/product/${slug}`)
-      return
-    }
-
     // Kiểm tra tồn kho
     if (currentStock <= 0) {
       toast.error("Sản phẩm đã hết hàng")
@@ -207,6 +216,15 @@ const ProductDetailPage = () => {
           quantity,
           options: Object.keys(productOptions).length > 0 ? productOptions : undefined,
           variantImage: variantImage,
+          // Thêm thông tin sản phẩm vào action
+          product: {
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            sale_price: product.sale_price,
+            image: product.image,
+            stock: currentStock,
+          },
         }),
       )
 
@@ -256,10 +274,10 @@ const ProductDetailPage = () => {
   // Parse variants if it's a string
   const variants = typeof product.variants === "string" ? JSON.parse(product.variants) : product.variants || {}
 
-  // Kiểm tra loại sản phẩm
-  const isPhone = product.product_type === "phone"
-  const isLaptop = product.product_type === "laptop"
-  const isAccessory = product.product_type === "accessory"
+  // Kiểm tra loại sản phẩm dựa trên variants
+  const hasColors = variants.colors && variants.colors.length > 0
+  const hasStorage = variants.storage && variants.storage.length > 0
+  const hasConfigs = variants.configs && variants.configs.length > 0
 
   return (
     <Layout>
@@ -282,7 +300,7 @@ const ProductDetailPage = () => {
               <h1 className="text-2xl font-bold mb-2">{product.name}</h1>
 
               <div className="flex items-center mb-4">
-                <Rating value={4.5} text={`(${product.review_count || 0} đánh giá)`} />
+                <Rating value={Number(product.rating) || 0} text={`(${product.review_count || 0} đánh giá)`} />
                 <span className="mx-4 text-gray-dark">|</span>
                 <span className={currentStock > 0 ? "text-green-600" : "text-red-600"}>
                   {currentStock > 0 ? `Còn hàng: ${currentStock}` : "Hết hàng"}
@@ -322,8 +340,8 @@ const ProductDetailPage = () => {
                 </div>
               </div>
 
-              {/* Tùy chọn màu sắc cho điện thoại */}
-              {isPhone && variants.colors && variants.colors.length > 0 && (
+              {/* Tùy chọn màu sắc */}
+              {hasColors && (
                 <div className="mb-6">
                   <div className="flex items-start">
                     <span className="w-24 text-gray-dark mt-2">Màu sắc:</span>
@@ -347,8 +365,8 @@ const ProductDetailPage = () => {
                 </div>
               )}
 
-              {/* Tùy chọn dung lượng cho điện thoại */}
-              {isPhone && variants.storage && variants.storage.length > 0 && (
+              {/* Tùy chọn dung lượng */}
+              {hasStorage && (
                 <div className="mb-6">
                   <div className="flex items-start">
                     <span className="w-24 text-gray-dark mt-2">Dung lượng:</span>
@@ -409,8 +427,8 @@ const ProductDetailPage = () => {
                 </div>
               )}
 
-              {/* Tùy chọn cấu hình cho laptop */}
-              {isLaptop && variants.configs && variants.configs.length > 0 && (
+              {/* Tùy chọn cấu hình */}
+              {hasConfigs && (
                 <div className="mb-6">
                   <div className="flex items-start">
                     <span className="w-24 text-gray-dark mt-2">Cấu hình:</span>
@@ -493,7 +511,7 @@ const ProductDetailPage = () => {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 mb-6">
+              <div className="flex mb-6">
                 <button
                   onClick={handleAddToCart}
                   className="btn btn-primary flex items-center justify-center"
@@ -551,7 +569,11 @@ const ProductDetailPage = () => {
           <div className="p-6">
             {activeTab === "description" && (
               <div>
-                <p>{product.description || "Không có mô tả cho sản phẩm này."}</p>
+                {product.description ? (
+                  <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
+                ) : (
+                  <p>Không có mô tả cho sản phẩm này.</p>
+                )}
               </div>
             )}
 
@@ -575,8 +597,19 @@ const ProductDetailPage = () => {
             )}
 
             {activeTab === "reviews" && (
-              <div>
-                <ReviewList productId={product.id} />
+              <div id="reviews-tab">
+                <ReviewList
+                  productId={product.id}
+                  onReviewUpdated={() => {
+                    // Cập nhật lại thông tin sản phẩm khi có đánh giá mới
+                    dispatch(fetchProductBySlug(slug))
+                  }}
+                />
+                {!isLoggedIn && (
+                  <div className="bg-gray-50 p-4 rounded-md text-center mt-6">
+                    <p className="mb-3">Đăng nhập để viết đánh giá cho sản phẩm này</p>
+                  </div>
+                )}
               </div>
             )}
           </div>

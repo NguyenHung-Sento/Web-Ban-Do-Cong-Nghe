@@ -9,7 +9,7 @@ import { register, resetRegistrationData } from "../features/auth/authSlice"
 import Layout from "../components/layout/Layout"
 import Spinner from "../components/ui/Spinner"
 import Captcha from "../components/ui/Captcha"
-import { FiUser, FiMail, FiLock, FiPhone, FiMapPin, FiEye, FiEyeOff } from "react-icons/fi"
+import { FiUser, FiMail, FiLock, FiPhone, FiEye, FiEyeOff } from "react-icons/fi"
 
 const RegisterPage = () => {
   const dispatch = useDispatch()
@@ -26,7 +26,6 @@ const RegisterPage = () => {
   const [phoneError, setPhoneError] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const [confirmPasswordError, setConfirmPasswordError] = useState("")
-  const [addressError, setAddressError] = useState("")
 
   const { isLoggedIn, isLoading, error, registrationData } = useSelector((state) => state.auth)
 
@@ -115,15 +114,6 @@ const RegisterPage = () => {
     return true
   }
 
-  const validateAddress = (value) => {
-    if (!value) {
-      setAddressError("Địa chỉ là bắt buộc")
-      return false
-    }
-    setAddressError("")
-    return true
-  }
-
   const formik = useFormik({
     initialValues: {
       name: "",
@@ -131,7 +121,6 @@ const RegisterPage = () => {
       password: "",
       confirmPassword: "",
       phone: "",
-      address: "",
     },
     validationSchema: Yup.object({
       name: Yup.string().required("Họ tên là bắt buộc"),
@@ -143,7 +132,6 @@ const RegisterPage = () => {
       phone: Yup.string()
         .matches(/^[0-9]{10,11}$/, "Số điện thoại không hợp lệ")
         .required("Số điện thoại là bắt buộc"),
-      address: Yup.string().required("Địa chỉ là bắt buộc"),
     }),
     onSubmit: (values) => {
       // Validate all fields before submitting
@@ -152,14 +140,13 @@ const RegisterPage = () => {
       const isPasswordValid = validatePassword(values.password)
       const isConfirmPasswordValid = validateConfirmPassword(values.confirmPassword, values.password)
       const isPhoneValid = validatePhone(values.phone)
-      const isAddressValid = validateAddress(values.address)
 
       if (!isCaptchaValid) {
         alert("Vui lòng xác nhận CAPTCHA")
         return
       }
 
-      if (isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid && isPhoneValid && isAddressValid) {
+      if (isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid && isPhoneValid) {
         setIsSubmitting(true)
         const { confirmPassword, ...userData } = values
         dispatch(register(userData))
@@ -335,32 +322,6 @@ const RegisterPage = () => {
               {phoneError && <div className="form-error">{phoneError}</div>}
             </div>
 
-            <div className="mb-4">
-              <label htmlFor="address" className="form-label">
-                Địa chỉ
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <FiMapPin className="text-gray-dark" />
-                </div>
-                <input
-                  type="text"
-                  id="address"
-                  name="address"
-                  className={`form-input pl-10 ${addressError ? "border-red-500" : ""}`}
-                  placeholder="Nhập địa chỉ của bạn"
-                  value={formik.values.address}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    formik.setFieldValue("address", value)
-                    validateAddress(value)
-                  }}
-                  onBlur={() => validateAddress(formik.values.address)}
-                />
-              </div>
-              {addressError && <div className="form-error">{addressError}</div>}
-            </div>
-
             <div className="mb-6">
               <label className="form-label">Xác nhận CAPTCHA</label>
               <Captcha onChange={handleCaptchaChange} />
@@ -400,4 +361,3 @@ const RegisterPage = () => {
 }
 
 export default RegisterPage
-

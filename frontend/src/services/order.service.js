@@ -1,24 +1,28 @@
 import api from "./api"
 
 const OrderService = {
-  getAllOrders: async () => {
-    const response = await api.get("/orders")
-    return response.data
-  },
-
-  getOrderById: async (id) => {
-    const response = await api.get(`/orders/${id}`)
-    return response.data
-  },
-
   createOrder: async (orderData) => {
     const response = await api.post("/orders", orderData)
     return response.data
   },
-
-  // Add this new method to delete an order
-  deleteOrder: async (id) => {
-    const response = await api.delete(`/orders/${id}`)
+  getOrderById: async (orderId) => {
+    const response = await api.get(`/orders/${orderId}`)
+    return response.data
+  },
+  updateOrder: async (orderId, orderData) => {
+    const response = await api.put(`/orders/${orderId}`, orderData)
+    return response.data
+  },
+  deleteOrder: async (orderId) => {
+    const response = await api.delete(`/orders/${orderId}`)
+    return response.data
+  },
+  getAllOrders: async () => {
+    const response = await api.get("/orders")
+    return response.data
+  },
+  getUserOrders: async () => {
+    const response = await api.get("/orders/user")
     return response.data
   },
 }

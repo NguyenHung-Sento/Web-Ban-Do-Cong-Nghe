@@ -27,7 +27,7 @@ const OrdersPage = () => {
     const fetchOrders = async () => {
       try {
         setIsLoading(true)
-        const response = await OrderService.getAllOrders()
+        const response = await OrderService.getUserOrders() 
         setOrders(response.data.orders)
         setIsLoading(false)
       } catch (error) {
@@ -201,12 +201,17 @@ const OrdersPage = () => {
                           </span>
                         </td>
                         <td className="py-4 px-6 text-center">
-                          <button
-                            onClick={() => toggleOrderDetails(order.id)}
-                            className="text-primary hover:text-primary-dark"
-                          >
-                            {expandedOrder === order.id ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
-                          </button>
+                          <div className="flex flex-col items-center">
+                            <button
+                              onClick={() => toggleOrderDetails(order.id)}
+                              className="text-primary hover:text-primary-dark"
+                            >
+                              {expandedOrder === order.id ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
+                            </button>
+                            <Link to={`/orders/${order.id}`} className="text-primary hover:underline flex items-center">
+                              Xem chi tiết
+                            </Link>
+                          </div>
                         </td>
                       </tr>
 
@@ -297,4 +302,3 @@ const OrdersPage = () => {
 }
 
 export default OrdersPage
-

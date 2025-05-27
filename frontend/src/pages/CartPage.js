@@ -14,10 +14,12 @@ import {
   selectAllItems,
 } from "../features/cart/cartSlice"
 import { FiTrash2, FiMinus, FiPlus, FiArrowLeft, FiShoppingCart } from "react-icons/fi"
+import { useLoginPrompt } from "../contexts/LoginPromptContext"
 
 const CartPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const { showLoginPrompt } = useLoginPrompt()
 
   const { items, totalItems, totalAmount, selectedItems, isLoading } = useSelector((state) => state.cart)
   const { isLoggedIn } = useSelector((state) => state.auth)
@@ -57,10 +59,9 @@ const CartPage = () => {
 
   // Update the useEffect hook that checks login status
   useEffect(() => {
-    if (isLoggedIn) {
-      dispatch(fetchCart())
-    }
-  }, [dispatch, isLoggedIn])
+    // Luôn fetch giỏ hàng, bất kể đăng nhập hay chưa
+    dispatch(fetchCart())
+  }, [dispatch])
 
   const handleQuantityChange = (itemId, quantity) => {
     if (quantity >= 1) {
@@ -99,6 +100,13 @@ const CartPage = () => {
       alert("Vui lòng chọn ít nhất một sản phẩm để thanh toán")
       return
     }
+
+    // Kiểm tra đăng nhập khi thanh toán
+    if (!isLoggedIn) {
+      showLoginPrompt("/checkout")
+      return
+    }
+
     navigate("/checkout")
   }
 
@@ -113,23 +121,12 @@ const CartPage = () => {
     return `${optionNames[optionKey] || optionKey}: ${optionValue}`
   }
 
-  // Replace the early return for not logged in users
-  if (!isLoggedIn) {
+  // Bỏ early return cho người dùng chưa đăng nhập
+  if (isLoading) {
     return (
       <Layout>
-        <div className="container-custom py-8">
-          <h1 className="mb-6">Giỏ hàng của bạn</h1>
-
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="flex justify-center mb-4">
-              <FiShoppingCart size={64} className="text-gray-dark" />
-            </div>
-            <h2 className="text-2xl font-bold mb-4">Vui lòng đăng nhập</h2>
-            <p className="text-gray-dark mb-6">Bạn cần đăng nhập để xem giỏ hàng của mình.</p>
-            <Link to={`/login?redirect=${encodeURIComponent("/cart")}`} className="btn btn-primary">
-              Đăng nhập
-            </Link>
-          </div>
+        <div className="container-custom py-20">
+          <Spinner size="lg" />
         </div>
       </Layout>
     )
@@ -140,11 +137,7 @@ const CartPage = () => {
       <div className="container-custom py-8">
         <h1 className="mb-6">Giỏ hàng của bạn</h1>
 
-        {isLoading ? (
-          <div className="py-20">
-            <Spinner size="lg" />
-          </div>
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <div className="flex justify-center mb-4">
               <FiShoppingCart size={64} className="text-gray-dark" />
@@ -196,7 +189,7 @@ const CartPage = () => {
                               className="w-16 h-16 object-contain mr-4"
                             />
                             <div>
-                              <Link to={`/product/${item.product_id}`} className="font-medium hover:text-primary">
+                              <Link to={`/product/${item.slug}`} className="font-medium hover:text-primary">
                                 {item.name}
                               </Link>
 
@@ -354,4 +347,3 @@ const CartPage = () => {
 }
 
 export default CartPage
-

@@ -2,6 +2,44 @@ const Product = require("../models/product.model")
 const fs = require("fs")
 const path = require("path")
 
+// Helper function to validate and parse JSON
+const validateAndParseJSON = (jsonString, fieldName) => {
+  if (!jsonString || typeof jsonString !== "string" || !jsonString.trim()) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(jsonString)
+    return JSON.stringify(parsed) // Re-stringify to ensure valid JSON
+  } catch (e) {
+    throw new Error(`${fieldName} phải là JSON hợp lệ`)
+  }
+}
+
+// Helper function to truncate description if too long
+const truncateDescription = (description, maxLength = 65535) => {
+  if (!description || typeof description !== "string") {
+    return description
+  }
+
+  if (description.length <= maxLength) {
+    return description
+  }
+
+  // Try to truncate at a reasonable point (end of a tag or sentence)
+  let truncated = description.substring(0, maxLength - 100) // Leave some buffer
+
+  // Find the last complete HTML tag
+  const lastTagEnd = truncated.lastIndexOf(">")
+  const lastTagStart = truncated.lastIndexOf("<", lastTagEnd)
+
+  if (lastTagStart > -1 && lastTagEnd > lastTagStart) {
+    truncated = truncated.substring(0, lastTagEnd + 1)
+  }
+
+  return truncated + "..."
+}
+
 // Lấy tất cả sản phẩm với phân trang và lọc
 exports.getAllProducts = async (req, res, next) => {
   try {
@@ -31,10 +69,42 @@ exports.getAllProducts = async (req, res, next) => {
     const products = await Product.findAll(limit, offset, filters)
     const total = await Product.countAll(filters)
 
+    // Parse JSON fields for each product
+    products.forEach((product) => {
+      if (product.specifications && typeof product.specifications === "string") {
+        try {
+          product.specifications = JSON.parse(product.specifications)
+        } catch (e) {
+          // Keep as string if not valid JSON
+        }
+      }
+
+      if (product.variants && typeof product.variants === "string") {
+        try {
+          product.variants = JSON.parse(product.variants)
+        } catch (e) {
+          // Keep as string if not valid JSON
+        }
+      }
+
+      if (product.images && typeof product.images === "string") {
+        try {
+          product.images = JSON.parse(product.images)
+        } catch (e) {
+          // If not JSON, split by comma
+          product.images = product.images
+            .split(",")
+            .map((img) => img.trim())
+            .filter((img) => img)
+        }
+      }
+    })
+
     res.json({
       status: "success",
       data: {
         products,
+        total, // Thêm total vào data level
         pagination: {
           page,
           limit,
@@ -59,6 +129,35 @@ exports.getProductById = async (req, res, next) => {
         status: "error",
         message: "Không tìm thấy sản phẩm",
       })
+    }
+
+    // Parse JSON fields if they are strings
+    if (product.specifications && typeof product.specifications === "string") {
+      try {
+        product.specifications = JSON.parse(product.specifications)
+      } catch (e) {
+        // Keep as string if not valid JSON
+      }
+    }
+
+    if (product.variants && typeof product.variants === "string") {
+      try {
+        product.variants = JSON.parse(product.variants)
+      } catch (e) {
+        // Keep as string if not valid JSON
+      }
+    }
+
+    if (product.images && typeof product.images === "string") {
+      try {
+        product.images = JSON.parse(product.images)
+      } catch (e) {
+        // If not JSON, split by comma
+        product.images = product.images
+          .split(",")
+          .map((img) => img.trim())
+          .filter((img) => img)
+      }
     }
 
     res.json({
@@ -100,27 +199,34 @@ exports.createProduct = async (req, res, next) => {
   try {
     const productData = { ...req.body }
 
-    // Xử lý variants nếu có
-    if (productData.variants && typeof productData.variants === "string") {
-      try {
-        productData.variants = JSON.parse(productData.variants)
-      } catch (e) {
-        return res.status(400).json({
-          status: "error",
-          message: "Định dạng variants không hợp lệ",
-        })
-      }
+    // Truncate description if too long
+    if (productData.description) {
+      productData.description = truncateDescription(productData.description)
     }
 
-    // Chuyển đổi specifications thành JSON nếu là chuỗi
-    if (productData.specifications && typeof productData.specifications === "string") {
-      try {
-        productData.specifications = JSON.parse(productData.specifications)
-      } catch (e) {
-        return res.status(400).json({
-          status: "error",
-          message: "Định dạng thông số kỹ thuật không hợp lệ",
-        })
+    // Validate and process JSON fields
+    if (productData.specifications) {
+      productData.specifications = validateAndParseJSON(productData.specifications, "Thông số kỹ thuật")
+    }
+
+    if (productData.variants) {
+      productData.variants = validateAndParseJSON(productData.variants, "Biến thể")
+    }
+
+    if (productData.images) {
+      // Handle images field
+      if (typeof productData.images === "string") {
+        if (productData.images.trim().startsWith("[")) {
+          // It's JSON array
+          productData.images = validateAndParseJSON(productData.images, "Gallery hình ảnh")
+        } else {
+          // It's comma-separated string
+          const imageArray = productData.images
+            .split(",")
+            .map((img) => img.trim())
+            .filter((img) => img)
+          productData.images = JSON.stringify(imageArray)
+        }
       }
     }
 
@@ -134,6 +240,7 @@ exports.createProduct = async (req, res, next) => {
       },
     })
   } catch (error) {
+    console.error("Error in createProduct:", error)
     next(error)
   }
 }
@@ -153,15 +260,34 @@ exports.updateProduct = async (req, res, next) => {
       })
     }
 
-    // Chuyển đổi specifications thành JSON nếu là chuỗi
-    if (productData.specifications && typeof productData.specifications === "string") {
-      try {
-        productData.specifications = JSON.parse(productData.specifications)
-      } catch (e) {
-        return res.status(400).json({
-          status: "error",
-          message: "Định dạng thông số kỹ thuật không hợp lệ",
-        })
+    // Truncate description if too long
+    if (productData.description) {
+      productData.description = truncateDescription(productData.description)
+    }
+
+    // Validate and process JSON fields
+    if (productData.specifications) {
+      productData.specifications = validateAndParseJSON(productData.specifications, "Thông số kỹ thuật")
+    }
+
+    if (productData.variants) {
+      productData.variants = validateAndParseJSON(productData.variants, "Biến thể")
+    }
+
+    if (productData.images) {
+      // Handle images field
+      if (typeof productData.images === "string") {
+        if (productData.images.trim().startsWith("[")) {
+          // It's JSON array
+          productData.images = validateAndParseJSON(productData.images, "Gallery hình ảnh")
+        } else {
+          // It's comma-separated string
+          const imageArray = productData.images
+            .split(",")
+            .map((img) => img.trim())
+            .filter((img) => img)
+          productData.images = JSON.stringify(imageArray)
+        }
       }
     }
 
@@ -179,6 +305,7 @@ exports.updateProduct = async (req, res, next) => {
       message: "Cập nhật sản phẩm thành công",
     })
   } catch (error) {
+    console.error("Error in updateProduct:", error)
     next(error)
   }
 }

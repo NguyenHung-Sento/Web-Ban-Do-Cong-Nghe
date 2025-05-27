@@ -7,6 +7,16 @@ exports.getCart = async (req, res, next) => {
   try {
     const cart = await Cart.findByUserId(req.user.id)
 
+    // Thêm URL đầy đủ cho hình ảnh sản phẩm
+    cart.items.forEach((item) => {
+      if (item.image) {
+        // Nếu là URL Cloudinary thì không cần thêm host
+        if (!item.image.startsWith("http")) {
+          item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
+        }
+      }
+    })
+
     res.json({
       status: "success",
       data: {
@@ -64,6 +74,16 @@ exports.addItem = async (req, res, next) => {
 
     // Thêm sản phẩm vào giỏ hàng - bao gồm cả variant_image nếu có
     const cart = await Cart.addItem(req.user.id, product_id, quantity, parsedOptions, variant_image)
+
+    // Thêm URL đầy đủ cho hình ảnh sản phẩm
+    cart.items.forEach((item) => {
+      if (item.image) {
+        // Nếu là URL Cloudinary thì không cần thêm host
+        if (!item.image.startsWith("http")) {
+          item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
+        }
+      }
+    })
 
     res.json({
       status: "success",
@@ -142,6 +162,16 @@ exports.updateItem = async (req, res, next) => {
 
     const updatedCart = await Cart.findByUserId(req.user.id)
 
+    // Thêm URL đầy đủ cho hình ảnh sản phẩm
+    updatedCart.items.forEach((item) => {
+      if (item.image) {
+        // Nếu là URL Cloudinary thì không cần thêm host
+        if (!item.image.startsWith("http")) {
+          item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
+        }
+      }
+    })
+
     res.json({
       status: "success",
       message: "Cập nhật giỏ hàng thành công",
@@ -188,6 +218,16 @@ exports.removeItem = async (req, res, next) => {
 
     const updatedCart = await Cart.findByUserId(req.user.id)
 
+    // Thêm URL đầy đủ cho hình ảnh sản phẩm
+    updatedCart.items.forEach((item) => {
+      if (item.image) {
+        // Nếu là URL Cloudinary thì không cần thêm host
+        if (!item.image.startsWith("http")) {
+          item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
+        }
+      }
+    })
+
     res.json({
       status: "success",
       message: "Xóa sản phẩm khỏi giỏ hàng thành công",
@@ -214,5 +254,95 @@ exports.clearCart = async (req, res, next) => {
     })
   } catch (error) {
     next(error)
+  }
+}
+
+// Add the mergeCart method
+exports.mergeCart = async (req, res) => {
+  try {
+    const userId = req.user.id
+    const { items } = req.body
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Invalid cart items" })
+    }
+
+    // Get the user's current cart
+    let cart = await Cart.findByUserId(userId)
+
+    // If user doesn't have a cart yet, create one
+    if (!cart) {
+      cart = await Cart.create({ user_id: userId })
+    }
+
+    // Get current cart items
+    const currentCartItems = cart.items || []
+
+    // Process each guest cart item
+    for (const guestItem of items) {
+      // Extract product info from guest item
+      const productId = guestItem.product_id
+      const quantity = guestItem.quantity
+      const options = guestItem.options || null
+
+      // Check if this product (with same options) already exists in user's cart
+      let existingItem = null
+
+      if (options) {
+        // For items with options, we need to compare options
+        for (const cartItem of currentCartItems) {
+          if (cartItem.product_id === productId) {
+            const cartItemOptions = cartItem.options ? JSON.parse(cartItem.options) : null
+
+            if (cartItemOptions) {
+              // Compare relevant options (excluding variantPrice and variantImage)
+              const areOptionsEqual = Object.keys(options)
+                .filter((key) => !["variantPrice", "variantImage"].includes(key))
+                .every((key) => options[key] === cartItemOptions[key])
+
+              if (areOptionsEqual) {
+                existingItem = cartItem
+                break
+              }
+            }
+          }
+        }
+      } else {
+        // For items without options, just check product_id
+        existingItem = currentCartItems.find((item) => item.product_id === productId && !item.options)
+      }
+
+      if (existingItem) {
+        // If item exists, update quantity
+        await Cart.updateItem(existingItem.id, userId, { quantity: existingItem.quantity + quantity })
+      } else {
+        // If item doesn't exist, create new cart item
+        await Cart.addItem(userId, productId, quantity, options)
+      }
+    }
+
+    // Get updated cart with items
+    const updatedCart = await Cart.findByUserId(userId)
+
+    // Thêm URL đầy đủ cho hình ảnh sản phẩm
+    updatedCart.items.forEach((item) => {
+      if (item.image) {
+        // Nếu là URL Cloudinary thì không cần thêm host
+        if (!item.image.startsWith("http")) {
+          item.image = `${req.protocol}://${req.get("host")}/uploads/${item.image}`
+        }
+      }
+    })
+
+    res.status(200).json({
+      status: "success",
+      message: "Cart merged successfully",
+      data: {
+        cart: updatedCart,
+      },
+    })
+  } catch (error) {
+    console.error("Error merging cart:", error)
+    res.status(500).json({ status: "error", message: "Failed to merge cart" })
   }
 }

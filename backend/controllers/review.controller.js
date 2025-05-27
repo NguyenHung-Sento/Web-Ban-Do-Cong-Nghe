@@ -2,6 +2,20 @@ const Review = require("../models/review.model")
 const Product = require("../models/product.model")
 const db = require("../config/db.config")
 
+// Thêm hàm cập nhật số lượng đánh giá và điểm đánh giá trung bình của sản phẩm
+const updateProductReviewStats = async (productId) => {
+  try {
+    // Chỉ đếm các đánh giá gốc (không phải reply) và không phải là reply của admin
+    const total = await Review.countByProductId(productId)
+    const averageRating = await Review.getAverageRating(productId)
+
+    // Cập nhật cả số lượng đánh giá và điểm đánh giá trung bình
+    await db.query(`UPDATE products SET review_count = ?, rating = ? WHERE id = ?`, [total, averageRating, productId])
+  } catch (error) {
+    console.error("Error updating product review stats:", error)
+  }
+}
+
 // Lấy đánh giá cho một sản phẩm
 exports.getProductReviews = async (req, res, next) => {
   try {
@@ -25,19 +39,6 @@ exports.getProductReviews = async (req, res, next) => {
     const averageRating = await Review.getAverageRating(productId)
     const ratingDistribution = await Review.getRatingDistribution(productId)
 
-    // Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
-    let userReview = null
-    let canReview = false
-
-    if (req.user) {
-      userReview = await Review.getUserReview(req.user.id, productId)
-
-      // Kiểm tra xem người dùng đã mua sản phẩm và thanh toán chưa
-      if (!userReview) {
-        canReview = await Review.checkUserPurchased(req.user.id, productId)
-      }
-    }
-
     res.json({
       status: "success",
       data: {
@@ -52,8 +53,6 @@ exports.getProductReviews = async (req, res, next) => {
           average_rating: Number.parseFloat(averageRating).toFixed(1),
           rating_distribution: ratingDistribution,
         },
-        user_review: userReview,
-        can_review: canReview,
       },
     })
   } catch (error) {
@@ -65,7 +64,7 @@ exports.getProductReviews = async (req, res, next) => {
 exports.createReview = async (req, res, next) => {
   try {
     const productId = req.params.productId
-    const { rating, comment } = req.body
+    const { rating, comment, productVariantDetails } = req.body
 
     // Kiểm tra xem sản phẩm có tồn tại không
     const product = await Product.findById(productId)
@@ -74,15 +73,6 @@ exports.createReview = async (req, res, next) => {
       return res.status(404).json({
         status: "error",
         message: "Không tìm thấy sản phẩm",
-      })
-    }
-
-    // Kiểm tra xem người dùng đã đánh giá sản phẩm này chưa
-    const hasReviewed = await Review.checkUserReviewed(req.user.id, productId)
-    if (hasReviewed) {
-      return res.status(400).json({
-        status: "error",
-        message: "Bạn đã đánh giá sản phẩm này rồi",
       })
     }
 
@@ -100,9 +90,13 @@ exports.createReview = async (req, res, next) => {
       user_id: req.user.id,
       rating,
       comment,
+      product_variant_details: productVariantDetails || null,
     })
 
     const review = await Review.findById(reviewId)
+
+    // Cập nhật số lượng đánh giá và điểm đánh giá trung bình của sản phẩm
+    await updateProductReviewStats(productId)
 
     res.status(201).json({
       status: "success",
@@ -193,6 +187,9 @@ exports.deleteReview = async (req, res, next) => {
       })
     }
 
+    // Cập nhật số lượng đánh giá và điểm đánh giá trung bình của sản phẩm
+    await updateProductReviewStats(review.product_id)
+
     res.json({
       status: "success",
       message: "Xóa đánh giá thành công",
@@ -220,7 +217,8 @@ exports.checkCanReview = async (req, res, next) => {
     const hasReviewed = await Review.checkUserReviewed(req.user.id, productId)
 
     // Kiểm tra xem người dùng đã mua sản phẩm và thanh toán chưa
-    const hasPurchased = await Review.checkUserPurchased(req.user.id, productId)
+    const purchaseDetails = await Review.checkUserPurchased(req.user.id, productId)
+    const hasPurchased = !!purchaseDetails
 
     // Lấy đánh giá của người dùng nếu có
     let userReview = null
@@ -231,11 +229,117 @@ exports.checkCanReview = async (req, res, next) => {
     res.json({
       status: "success",
       data: {
-        can_review: !hasReviewed && hasPurchased,
+        can_review: hasPurchased,
         has_reviewed: hasReviewed,
         has_purchased: hasPurchased,
         user_review: userReview,
+        purchase_details: purchaseDetails,
       },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// Thêm API để admin trả lời đánh giá
+exports.replyToReview = async (req, res, next) => {
+  try {
+    const { reviewId } = req.params
+    const { comment } = req.body
+
+    // Kiểm tra xem người dùng có phải admin không
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        status: "error",
+        message: "Chỉ admin mới có quyền trả lời đánh giá",
+      })
+    }
+
+    // Kiểm tra xem đánh giá có tồn tại không
+    const parentReview = await Review.findById(reviewId)
+    if (!parentReview) {
+      return res.status(404).json({
+        status: "error",
+        message: "Không tìm thấy đánh giá",
+      })
+    }
+
+    // Kiểm tra xem đánh giá này đã có reply chưa
+    const existingReply = await Review.findReplyByParentId(reviewId)
+    if (existingReply) {
+      // Cập nhật reply hiện có
+      await Review.updateReply(existingReply.id, { comment })
+
+      const updatedReply = await Review.findById(existingReply.id)
+
+      return res.json({
+        status: "success",
+        message: "Cập nhật trả lời thành công",
+        data: {
+          review: updatedReply,
+        },
+      })
+    }
+
+    // Tạo reply mới - sử dụng rating = 5 để tránh vi phạm ràng buộc CHECK
+    const replyData = {
+      parent_id: reviewId,
+      product_id: parentReview.product_id,
+      user_id: req.user.id,
+      comment,
+      is_admin_reply: true,
+      rating: 5, // Đặt rating = 5 để tránh vi phạm ràng buộc CHECK
+    }
+
+    const replyId = await Review.createReply(replyData)
+    const reply = await Review.findById(replyId)
+
+    res.status(201).json({
+      status: "success",
+      message: "Trả lời đánh giá thành công",
+      data: {
+        review: reply,
+      },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// Thêm API để xóa trả lời đánh giá
+exports.deleteReply = async (req, res, next) => {
+  try {
+    const { replyId } = req.params
+
+    // Kiểm tra xem người dùng có phải admin không
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        status: "error",
+        message: "Chỉ admin mới có quyền xóa trả lời đánh giá",
+      })
+    }
+
+    // Kiểm tra xem reply có tồn tại không
+    const reply = await Review.findById(replyId)
+    if (!reply || !reply.parent_id) {
+      return res.status(404).json({
+        status: "error",
+        message: "Không tìm thấy trả lời đánh giá",
+      })
+    }
+
+    const success = await Review.delete(replyId)
+
+    if (!success) {
+      return res.status(404).json({
+        status: "error",
+        message: "Không tìm thấy trả lời đánh giá",
+      })
+    }
+
+    res.json({
+      status: "success",
+      message: "Xóa trả lời đánh giá thành công",
     })
   } catch (error) {
     next(error)

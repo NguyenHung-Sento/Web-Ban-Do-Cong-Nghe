@@ -126,7 +126,7 @@ const Header = () => {
         <div className="flex items-center justify-between px-32">
           {/* Logo */}
           <Link to="/" className="text-2xl font-bold text-white">
-            CellPhone
+            DigitalW
           </Link>
 
           {/* Search bar - hidden on mobile */}

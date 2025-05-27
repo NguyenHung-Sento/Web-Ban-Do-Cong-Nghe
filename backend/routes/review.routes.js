@@ -36,4 +36,15 @@ router.put(
 
 router.delete("/:reviewId", authenticate, reviewController.deleteReview)
 
+// Admin reply routes
+router.post(
+  "/:reviewId/reply",
+  authenticate,
+  [body("comment").notEmpty().withMessage("Nội dung trả lời là bắt buộc")],
+  validate,
+  reviewController.replyToReview,
+)
+
+router.delete("/reply/:replyId", authenticate, reviewController.deleteReply)
+
 module.exports = router

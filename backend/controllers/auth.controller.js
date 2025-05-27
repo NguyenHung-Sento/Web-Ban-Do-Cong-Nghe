@@ -5,6 +5,7 @@ const EmailService = require("../services/email.service")
 const jwt = require("jsonwebtoken")
 const db = require("../config/db.config")
 const crypto = require("crypto")
+const passport = require("passport")
 
 // Generate a random OTP
 const generateOTP = () => {
@@ -28,10 +29,10 @@ const generateRefreshToken = (user) => {
 // Đăng ký người dùng mới - Bước 1: Gửi OTP
 exports.register = async (req, res, next) => {
   try {
-    const { name, email, password, phone, address } = req.body
+    const { name, email, password, phone } = req.body
 
     // Validate required fields
-    if (!name || !email || !password || !phone || !address) {
+    if (!name || !email || !password || !phone) {
       return res.status(400).json({
         status: "error",
         message: "Vui lòng điền đầy đủ thông tin",
@@ -53,7 +54,6 @@ exports.register = async (req, res, next) => {
       email,
       password,
       phone,
-      address,
       role: "user", // Vai trò mặc định
     }
 
@@ -265,6 +265,39 @@ exports.login = async (req, res, next) => {
   }
 }
 
+// Social login success handler
+exports.socialLoginSuccess = async (req, res) => {
+  try {
+    // User should be attached to req by passport
+    if (!req.user) {
+      return res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`)
+    }
+
+    const user = req.user
+
+    // Generate tokens
+    const accessToken = generateAccessToken(user)
+    const refreshToken = generateRefreshToken(user)
+
+    // Save refresh token
+    const refreshExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+    await Token.saveRefreshToken(user.id, refreshToken, refreshExpires)
+
+    // Redirect to frontend with tokens
+    res.redirect(
+      `${process.env.CLIENT_URL}/social-auth-callback?token=${accessToken}&refreshToken=${refreshToken}&userId=${user.id}`,
+    )
+  } catch (error) {
+    console.error("Social login success error:", error)
+    res.redirect(`${process.env.CLIENT_URL}/login?error=server_error`)
+  }
+}
+
+// Social login failure handler
+exports.socialLoginFailure = (req, res) => {
+  res.redirect(`${process.env.CLIENT_URL}/login?error=auth_failed`)
+}
+
 // Refresh token
 exports.refreshToken = async (req, res, next) => {
   try {
@@ -386,9 +419,9 @@ exports.getProfile = async (req, res, next) => {
 // Cập nhật thông tin người dùng
 exports.updateProfile = async (req, res, next) => {
   try {
-    const { name, phone, address } = req.body
+    const { name, phone } = req.body
 
-    if (!name || !phone || !address) {
+    if (!name || !phone) {
       return res.status(400).json({
         status: "error",
         message: "Vui lòng điền đầy đủ thông tin",
@@ -398,7 +431,6 @@ exports.updateProfile = async (req, res, next) => {
     const success = await User.update(req.user.id, {
       name,
       phone,
-      address,
     })
 
     if (!success) {
@@ -408,12 +440,27 @@ exports.updateProfile = async (req, res, next) => {
       })
     }
 
+    // Lấy thông tin user đã được cập nhật
+    const updatedUser = await User.findById(req.user.id)
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        status: "error",
+        message: "Không thể lấy thông tin người dùng đã cập nhật",
+      })
+    }
+
+    // Loại bỏ password khỏi response
+    delete updatedUser.password
+
     res.json({
       status: "success",
       message: "Cập nhật thông tin thành công",
+      data: {
+        user: updatedUser,
+      },
     })
   } catch (error) {
-    console.error("Update profile error:", error)
     next(error)
   }
 }
@@ -471,4 +518,3 @@ exports.changePassword = async (req, res, next) => {
     next(error)
   }
 }
-

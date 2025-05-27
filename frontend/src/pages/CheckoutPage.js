@@ -26,6 +26,8 @@ import MomoPayment from "../components/payment/MomoPayment"
 import VNPayPayment from "../components/payment/VNPayPayment"
 import CodPayment from "../components/payment/CodPayment"
 import PaymentService from "../services/payment.service"
+// Thêm import
+import AddressService from "../services/address.service"
 
 const CheckoutPage = () => {
   const navigate = useNavigate()
@@ -40,9 +42,15 @@ const CheckoutPage = () => {
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [showCreditCardForm, setShowCreditCardForm] = useState(false)
   const [creditCardPaymentSuccess, setCreditCardPaymentSuccess] = useState(false)
+  const [isCreatingAddress, setIsCreatingAddress] = useState(false)
 
   const { items, totalItems, totalAmount, isLoading } = useSelector((state) => state.cart)
   const { isLoggedIn, user } = useSelector((state) => state.auth)
+
+  // Thêm state cho địa chỉ
+  const [addresses, setAddresses] = useState([])
+  const [selectedAddressId, setSelectedAddressId] = useState(null)
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false)
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -52,6 +60,64 @@ const CheckoutPage = () => {
 
     dispatch(fetchCart())
   }, [dispatch, isLoggedIn, navigate])
+
+  // Thêm useEffect để load địa chỉ
+  useEffect(() => {
+    if (isLoggedIn) {
+      loadAddresses()
+    }
+  }, [isLoggedIn])
+
+  const loadAddresses = async () => {
+    try {
+      const response = await AddressService.getUserAddresses()
+      setAddresses(response.data.addresses)
+
+      // Tự động chọn địa chỉ mặc định
+      const defaultAddress = response.data.addresses.find((addr) => addr.is_default)
+      if (defaultAddress) {
+        setSelectedAddressId(defaultAddress.id)
+        formik.setFieldValue("address", defaultAddress.address_text)
+      }
+    } catch (error) {
+      console.error("Error loading addresses:", error)
+    }
+  }
+
+  const handleCreateNewAddress = async () => {
+    try {
+      if (!formik.values.address || formik.values.address.trim() === "") {
+        setError("Vui lòng nhập địa chỉ")
+        return
+      }
+
+      setIsCreatingAddress(true)
+      setError(null)
+
+      const addressData = {
+        address_text: formik.values.address.trim(),
+        is_default: false,
+      }
+
+      const response = await AddressService.createAddress(addressData)
+
+      // Reload danh sách địa chỉ
+      await loadAddresses()
+
+      // Tìm và chọn địa chỉ mới tạo
+      const newAddresses = await AddressService.getUserAddresses()
+      const newAddress = newAddresses.data.addresses.find((addr) => addr.address_text === addressData.address_text)
+
+      if (newAddress) {
+        setSelectedAddressId(newAddress.id)
+        setShowNewAddressForm(false)
+      }
+    } catch (error) {
+      setError(error.response?.data?.message || "Không thể tạo địa chỉ mới")
+    } finally {
+      setIsCreatingAddress(false)
+    }
+  }
 
   useEffect(() => {
     if (items.length === 0 && !isLoading) {
@@ -148,6 +214,13 @@ const CheckoutPage = () => {
       setShowCreditCardForm(false)
       setCreditCardPaymentSuccess(false)
     }
+  }
+
+  // Thêm hàm xử lý chọn địa chỉ
+  const handleAddressSelect = (address) => {
+    setSelectedAddressId(address.id)
+    formik.setFieldValue("address", address.address_text)
+    setShowNewAddressForm(false)
   }
 
   const handlePaymentProcessed = (paymentId) => {
@@ -332,25 +405,99 @@ const CheckoutPage = () => {
                       )}
                     </div>
 
+                    {/* Thay thế phần input địa chỉ trong form bằng: */}
                     <div className="mb-6">
-                      <label htmlFor="address" className="form-label">
-                        Địa chỉ
-                      </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                          <FiMapPin className="text-gray-dark" />
+                      <label className="form-label">Địa chỉ giao hàng</label>
+
+                      {/* Danh sách địa chỉ có sẵn */}
+                      {addresses.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm text-gray-600 mb-2">Chọn địa chỉ có sẵn:</p>
+                          <div className="space-y-2">
+                            {addresses.map((address) => (
+                              <div
+                                key={address.id}
+                                className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                                  selectedAddressId === address.id
+                                    ? "border-primary bg-primary bg-opacity-5"
+                                    : "border-gray-200 hover:border-primary"
+                                }`}
+                                onClick={() => handleAddressSelect(address)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center">
+                                    <input
+                                      type="radio"
+                                      name="selectedAddress"
+                                      checked={selectedAddressId === address.id}
+                                      onChange={() => handleAddressSelect(address)}
+                                      className="mr-2"
+                                    />
+                                    <div>
+                                      <p className="text-sm">{address.address_text}</p>
+                                      {(address.is_default === 1 || address.is_default === true) && (
+                                        <span className="text-xs text-primary">Mặc định</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <input
-                          type="text"
-                          id="address"
-                          name="address"
-                          className={`form-input pl-10 ${
-                            formik.touched.address && formik.errors.address ? "border-red-500" : ""
-                          }`}
-                          placeholder="Nhập địa chỉ giao hàng đầy đủ"
-                          {...formik.getFieldProps("address")}
-                        />
-                      </div>
+                      )}
+
+                      {/* Nút thêm địa chỉ mới */}
+                      <button
+                        type="button"
+                        onClick={() => setShowNewAddressForm(!showNewAddressForm)}
+                        className="text-primary hover:text-primary-dark mb-2"
+                      >
+                        + Thêm địa chỉ mới
+                      </button>
+
+                      {/* Form địa chỉ mới */}
+                      {showNewAddressForm && (
+                        <div className="border rounded-lg p-4 bg-gray-50">
+                          <div className="relative mb-3">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                              <FiMapPin className="text-gray-dark" />
+                            </div>
+                            <input
+                              type="text"
+                              id="address"
+                              name="address"
+                              className={`form-input pl-10 ${
+                                formik.touched.address && formik.errors.address ? "border-red-500" : ""
+                              }`}
+                              placeholder="Nhập địa chỉ giao hàng mới"
+                              {...formik.getFieldProps("address")}
+                            />
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={handleCreateNewAddress}
+                              disabled={isCreatingAddress}
+                              className="btn btn-primary flex-1"
+                            >
+                              {isCreatingAddress ? <Spinner size="sm" /> : "Lưu địa chỉ"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowNewAddressForm(false)
+                                formik.setFieldValue("address", "")
+                              }}
+                              className="btn btn-secondary"
+                            >
+                              Hủy
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {formik.touched.address && formik.errors.address && (
                         <div className="form-error">{formik.errors.address}</div>
                       )}

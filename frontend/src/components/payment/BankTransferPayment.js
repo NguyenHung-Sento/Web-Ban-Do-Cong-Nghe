@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { FiCopy, FiCheck, FiDownload } from "react-icons/fi"
+import { FiCopy, FiCheck, FiDownload, FiRefreshCw } from "react-icons/fi"
 import PaymentService from "../../services/payment.service"
 import Spinner from "../ui/Spinner"
+import { toast } from "react-toastify"
 
 const BankTransferPayment = ({ orderId, amount, onPaymentProcessed, ...props }) => {
   const [banks, setBanks] = useState([])
@@ -18,28 +19,33 @@ const BankTransferPayment = ({ orderId, amount, onPaymentProcessed, ...props }) 
     transferContent: false,
     amount: false,
   })
-  // Thêm state để lưu payment_id
   const [paymentId, setPaymentId] = useState(null)
-
-  // Thêm state để theo dõi trạng thái thanh toán
   const [paymentConfirmed, setPaymentConfirmed] = useState(false)
+  const [checkingStatus, setCheckingStatus] = useState(false)
 
-  // Thêm hàm xác nhận thanh toán
-  const confirmPayment = () => {
-    // Trong môi trường thực tế, đây là nơi bạn sẽ kiểm tra xem người dùng đã thanh toán chưa
-    // Ví dụ: gọi API để kiểm tra trạng thái thanh toán
+  // Auto-check payment status every 10 seconds
+  useEffect(() => {
+    if (paymentId && !paymentConfirmed) {
+      const interval = setInterval(async () => {
+        try {
+          const response = await PaymentService.checkPaymentStatus(orderId)
+          if (response.data.payment_status === "paid") {
+            setPaymentConfirmed(true)
+            toast.success("Thanh toán đã được xác nhận!")
+            onPaymentProcessed(paymentId)
+            clearInterval(interval)
+          }
+        } catch (error) {
+          console.error("Error checking payment status:", error)
+        }
+      }, 10000) // Check every 10 seconds
 
-    // Đánh dấu là đã thanh toán và gọi callback
-    setPaymentConfirmed(true)
-    if (paymentId) {
-      onPaymentProcessed(paymentId)
+      return () => clearInterval(interval)
     }
-  }
+  }, [paymentId, paymentConfirmed, orderId, onPaymentProcessed])
 
-  // Sửa useEffect để tự động tạo QR code cho ngân hàng đầu tiên
   useEffect(() => {
     const processPayment = async () => {
-      // If payment processing has already started, don't process again
       if (props.paymentProcessingStarted) return
 
       try {
@@ -52,16 +58,12 @@ const BankTransferPayment = ({ orderId, amount, onPaymentProcessed, ...props }) 
         setBanks(response.data.bank_accounts)
         setOrderCode(response.data.order_code)
         setTransferContent(response.data.transfer_content)
-
-        // Lưu payment_id để sử dụng sau này
         setPaymentId(response.data.payment_id)
 
-        // Nếu có ngân hàng, tự động chọn ngân hàng đầu tiên và tạo QR code
         if (response.data.bank_accounts && response.data.bank_accounts.length > 0) {
           const firstBank = response.data.bank_accounts[0]
           setSelectedBank(firstBank)
 
-          // Tự động tạo QR code cho ngân hàng đầu tiên
           try {
             const qrResponse = await PaymentService.generateBankQR(firstBank.id, orderId)
             setQrCode(qrResponse.data.qr_code)
@@ -71,6 +73,7 @@ const BankTransferPayment = ({ orderId, amount, onPaymentProcessed, ...props }) 
         }
       } catch (error) {
         setError(error.response?.data?.message || "Không thể xử lý thanh toán")
+        toast.error("Không thể xử lý thanh toán")
       } finally {
         setLoading(false)
       }
@@ -87,12 +90,14 @@ const BankTransferPayment = ({ orderId, amount, onPaymentProcessed, ...props }) 
       setQrCode(response.data.qr_code)
     } catch (error) {
       console.error("Không thể tạo mã QR:", error)
+      toast.error("Không thể tạo mã QR")
     }
   }
 
   const copyToClipboard = (text, field) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopied({ ...copied, [field]: true })
+      toast.success("Đã sao chép!")
       setTimeout(() => {
         setCopied({ ...copied, [field]: false })
       }, 2000)
@@ -106,6 +111,41 @@ const BankTransferPayment = ({ orderId, amount, onPaymentProcessed, ...props }) 
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    toast.success("Đã tải mã QR!")
+  }
+
+  const checkPaymentStatus = async () => {
+    try {
+      setCheckingStatus(true)
+      const response = await PaymentService.checkPaymentStatus(orderId)
+
+      if (response.data.payment_status === "paid") {
+        setPaymentConfirmed(true)
+        toast.success("Thanh toán đã được xác nhận!")
+        onPaymentProcessed(paymentId)
+      } else {
+        toast.info("Chưa nhận được xác nhận thanh toán")
+      }
+    } catch (error) {
+      console.error("Error checking payment status:", error)
+      toast.error("Không thể kiểm tra trạng thái thanh toán")
+    } finally {
+      setCheckingStatus(false)
+    }
+  }
+
+  const confirmPayment = async () => {
+    try {
+      if (paymentId) {
+        await PaymentService.confirmPayment(paymentId)
+        setPaymentConfirmed(true)
+        toast.success("Đã xác nhận thanh toán!")
+        onPaymentProcessed(paymentId)
+      }
+    } catch (error) {
+      console.error("Error confirming payment:", error)
+      toast.error("Không thể xác nhận thanh toán")
+    }
   }
 
   if (loading) {
@@ -120,6 +160,22 @@ const BankTransferPayment = ({ orderId, amount, onPaymentProcessed, ...props }) 
     return <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
   }
 
+  if (paymentConfirmed) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FiCheck className="text-green-500 text-2xl" />
+          </div>
+          <h3 className="text-xl font-bold mb-2">Thanh toán thành công!</h3>
+          <p className="text-gray-600 mb-4">
+            Thanh toán của bạn đã được xác nhận. Đơn hàng của bạn sẽ được xử lý trong thời gian sớm nhất.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <h3 className="text-xl font-bold mb-4">Chuyển khoản ngân hàng</h3>
@@ -127,13 +183,13 @@ const BankTransferPayment = ({ orderId, amount, onPaymentProcessed, ...props }) 
       <div className="mb-6">
         <p className="text-gray-700 mb-2">Vui lòng chuyển khoản theo thông tin dưới đây:</p>
         <p className="text-sm text-gray-500 mb-4">
-          Sau khi chuyển khoản thành công, đơn hàng của bạn sẽ được xử lý trong vòng 24 giờ.
+          Sau khi chuyển khoản thành công, hệ thống sẽ tự động xác nhận trong vòng vài phút.
         </p>
 
         <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
           <p className="text-blue-700 text-sm">
-            <strong>Lưu ý:</strong> Vui lòng ghi đúng nội dung chuyển khoản để chúng tôi có thể xác nhận thanh toán của
-            bạn nhanh chóng.
+            <strong>Lưu ý:</strong> Vui lòng ghi đúng nội dung chuyển khoản để hệ thống có thể tự động xác nhận thanh
+            toán.
           </p>
         </div>
       </div>
@@ -241,19 +297,32 @@ const BankTransferPayment = ({ orderId, amount, onPaymentProcessed, ...props }) 
         </>
       )}
 
-      <div className="mt-6 mb-6">
+      <div className="mt-6 mb-6 space-y-3">
+        <button
+          onClick={checkPaymentStatus}
+          className="w-full btn btn-secondary flex items-center justify-center"
+          disabled={checkingStatus}
+        >
+          {checkingStatus ? (
+            <Spinner size="sm" />
+          ) : (
+            <>
+              <FiRefreshCw className="mr-2" /> Kiểm tra trạng thái thanh toán
+            </>
+          )}
+        </button>
+
         <button onClick={confirmPayment} className="w-full btn btn-primary" disabled={paymentConfirmed}>
           {paymentConfirmed ? "Đã xác nhận thanh toán" : "Tôi đã thanh toán"}
         </button>
-        <p className="text-sm text-center mt-2 text-gray-600">
-          Nhấn vào nút trên sau khi bạn đã hoàn tất việc chuyển khoản
-        </p>
+
+        <p className="text-sm text-center text-gray-600">Hệ thống sẽ tự động kiểm tra và xác nhận thanh toán của bạn</p>
       </div>
 
       <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-md p-4">
         <p className="text-yellow-700 text-sm">
-          <strong>Hướng dẫn:</strong> Sau khi chuyển khoản, vui lòng chụp màn hình giao dịch và gửi cho chúng tôi qua
-          email hoặc hotline để được xác nhận nhanh chóng.
+          <strong>Hướng dẫn:</strong> Sau khi chuyển khoản, hệ thống sẽ tự động xác nhận trong vòng 10 phút. Nếu chưa
+          được xác nhận, vui lòng liên hệ hotline để được hỗ trợ.
         </p>
       </div>
     </div>
