@@ -1,118 +1,141 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Link, useNavigate, useLocation } from "react-router-dom"
-import { useDispatch, useSelector } from "react-redux"
-import { useFormik } from "formik"
-import * as Yup from "yup"
-import { register, resetRegistrationData } from "../features/auth/authSlice"
-import Layout from "../components/layout/Layout"
-import Spinner from "../components/ui/Spinner"
-import Captcha from "../components/ui/Captcha"
-import { FiUser, FiMail, FiLock, FiPhone, FiEye, FiEyeOff } from "react-icons/fi"
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import { register, resetRegistrationData } from "../features/auth/authSlice";
+import Layout from "../components/layout/Layout";
+import Spinner from "../components/ui/Spinner";
+import Captcha from "../components/ui/Captcha";
+import {
+  FiUser,
+  FiMail,
+  FiLock,
+  FiPhone,
+  FiEye,
+  FiEyeOff,
+} from "react-icons/fi";
 
 const RegisterPage = () => {
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
-  const location = useLocation()
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isCaptchaValid, setIsCaptchaValid] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isCaptchaValid, setIsCaptchaValid] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [nameError, setNameError] = useState("")
-  const [emailError, setEmailError] = useState("")
-  const [phoneError, setPhoneError] = useState("")
-  const [passwordError, setPasswordError] = useState("")
-  const [confirmPasswordError, setConfirmPasswordError] = useState("")
+  const [nameError, setNameError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
 
-  const { isLoggedIn, isLoading, error, registrationData } = useSelector((state) => state.auth)
+  const { isLoggedIn, isLoading, error, registrationData } = useSelector(
+    (state) => state.auth
+  );
 
   // Get redirect path from URL query params
-  const redirect = location.search ? location.search.split("=")[1] : "/"
+  const redirect = location.search ? location.search.split("=")[1] : "/";
 
   useEffect(() => {
     // Reset registration data when component mounts
-    dispatch(resetRegistrationData())
+    dispatch(resetRegistrationData());
 
     // If user is already logged in, redirect
     if (isLoggedIn) {
-      navigate(redirect)
+      navigate(redirect);
     }
 
     // If registration was successful and requires verification, redirect to verification page
     if (registrationData && registrationData.requireVerification) {
-      navigate(`/verify-email?email=${encodeURIComponent(registrationData.email)}`)
+      navigate(
+        `/verify-email?email=${encodeURIComponent(registrationData.email)}`
+      );
     }
-  }, [isLoggedIn, navigate, redirect, registrationData, dispatch])
+  }, [isLoggedIn, navigate, redirect, registrationData, dispatch]);
 
   // Real-time validation functions
   const validateName = (value) => {
     if (!value) {
-      setNameError("Họ tên là bắt buộc")
-      return false
+      setNameError("Họ tên là bắt buộc");
+      return false;
     }
     if (/\d/.test(value)) {
-      setNameError("Họ tên không được chứa số")
-      return false
+      setNameError("Họ tên không được chứa số");
+      return false;
     }
-    setNameError("")
-    return true
-  }
+    setNameError("");
+    return true;
+  };
 
   const validateEmail = (value) => {
     if (!value) {
-      setEmailError("Email là bắt buộc")
-      return false
+      setEmailError("Email là bắt buộc");
+      return false;
     }
     // Validate email format with domain after @ symbol
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-      setEmailError("Email không hợp lệ, phải có định dạng example@domain.com")
-      return false
+      setEmailError("Email không hợp lệ, phải có định dạng example@domain.com");
+      return false;
     }
-    setEmailError("")
-    return true
-  }
+    setEmailError("");
+    return true;
+  };
 
   const validatePhone = (value) => {
     if (!value) {
-      setPhoneError("Số điện thoại là bắt buộc")
-      return false
+      setPhoneError("Số điện thoại là bắt buộc");
+      return false;
     }
     if (!/^[0-9]{10,11}$/.test(value)) {
-      setPhoneError("Số điện thoại phải có 10-11 chữ số")
-      return false
+      setPhoneError("Số điện thoại phải có 10-11 chữ số");
+      return false;
     }
-    setPhoneError("")
-    return true
-  }
+    setPhoneError("");
+    return true;
+  };
 
   const validatePassword = (value) => {
     if (!value) {
-      setPasswordError("Mật khẩu là bắt buộc")
-      return false
+      setPasswordError("Mật khẩu là bắt buộc");
+      return false;
     }
     if (value.length < 6) {
-      setPasswordError("Mật khẩu phải có ít nhất 6 ký tự")
-      return false
+      setPasswordError("Mật khẩu phải có ít nhất 6 ký tự");
+      return false;
     }
-    setPasswordError("")
-    return true
-  }
+    if (!/[A-Z]/.test(value)) {
+      setPasswordError("Mật khẩu phải chứa ít nhất một chữ in hoa");
+      return false;
+    }
+    if (!/[0-9]/.test(value)) {
+      setPasswordError("Mật khẩu phải chứa ít nhất một số");
+      return false;
+    }
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(value)) {
+      setPasswordError("Mật khẩu phải chứa ít nhất một ký tự đặc biệt");
+      return false;
+    }
+    setPasswordError("");
+    return true;
+  };
 
   const validateConfirmPassword = (value, password) => {
     if (!value) {
-      setConfirmPasswordError("Xác nhận mật khẩu là bắt buộc")
-      return false
+      setConfirmPasswordError("Xác nhận mật khẩu là bắt buộc");
+      return false;
     }
     if (value !== password) {
-      setConfirmPasswordError("Mật khẩu không khớp")
-      return false
+      setConfirmPasswordError("Mật khẩu không khớp");
+      return false;
     }
-    setConfirmPasswordError("")
-    return true
-  }
+    setConfirmPasswordError("");
+    return true;
+  };
 
   const formik = useFormik({
     initialValues: {
@@ -124,8 +147,18 @@ const RegisterPage = () => {
     },
     validationSchema: Yup.object({
       name: Yup.string().required("Họ tên là bắt buộc"),
-      email: Yup.string().email("Email không hợp lệ").required("Email là bắt buộc"),
-      password: Yup.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự").required("Mật khẩu là bắt buộc"),
+      email: Yup.string()
+        .email("Email không hợp lệ")
+        .required("Email là bắt buộc"),
+      password: Yup.string()
+        .min(6, "Mật khẩu phải có ít nhất 6 ký tự")
+        .matches(/[A-Z]/, "Mật khẩu phải chứa ít nhất một chữ in hoa")
+        .matches(/[0-9]/, "Mật khẩu phải chứa ít nhất một số")
+        .matches(
+          /[!@#$%^&*(),.?":{}|<>]/,
+          "Mật khẩu phải chứa ít nhất một ký tự đặc biệt"
+        )
+        .required("Mật khẩu là bắt buộc"),
       confirmPassword: Yup.string()
         .oneOf([Yup.ref("password"), null], "Mật khẩu không khớp")
         .required("Xác nhận mật khẩu là bắt buộc"),
@@ -135,40 +168,55 @@ const RegisterPage = () => {
     }),
     onSubmit: (values) => {
       // Validate all fields before submitting
-      const isNameValid = validateName(values.name)
-      const isEmailValid = validateEmail(values.email)
-      const isPasswordValid = validatePassword(values.password)
-      const isConfirmPasswordValid = validateConfirmPassword(values.confirmPassword, values.password)
-      const isPhoneValid = validatePhone(values.phone)
+      const isNameValid = validateName(values.name);
+      const isEmailValid = validateEmail(values.email);
+      const isPasswordValid = validatePassword(values.password);
+      const isConfirmPasswordValid = validateConfirmPassword(
+        values.confirmPassword,
+        values.password
+      );
+      const isPhoneValid = validatePhone(values.phone);
 
       if (!isCaptchaValid) {
-        alert("Vui lòng xác nhận CAPTCHA")
-        return
+        alert("Vui lòng xác nhận CAPTCHA");
+        return;
       }
 
-      if (isNameValid && isEmailValid && isPasswordValid && isConfirmPasswordValid && isPhoneValid) {
-        setIsSubmitting(true)
-        const { confirmPassword, ...userData } = values
+      if (
+        isNameValid &&
+        isEmailValid &&
+        isPasswordValid &&
+        isConfirmPasswordValid &&
+        isPhoneValid
+      ) {
+        setIsSubmitting(true);
+        const { confirmPassword, ...userData } = values;
         dispatch(register(userData))
           .unwrap()
           .catch(() => {
-            setIsSubmitting(false)
-          })
+            setIsSubmitting(false);
+          });
       }
     },
-  })
+  });
 
   const handleCaptchaChange = (isValid) => {
-    setIsCaptchaValid(isValid)
-  }
+    setIsCaptchaValid(isValid);
+  };
 
   return (
     <Layout>
       <div className="container-custom py-12">
         <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-8">
-          <h1 className="text-2xl font-bold text-center mb-6">Đăng ký tài khoản</h1>
+          <h1 className="text-2xl font-bold text-center mb-6">
+            Đăng ký tài khoản
+          </h1>
 
-          {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={formik.handleSubmit}>
             <div className="mb-4">
@@ -183,14 +231,16 @@ const RegisterPage = () => {
                   type="text"
                   id="name"
                   name="name"
-                  className={`form-input pl-10 ${nameError ? "border-red-500" : ""}`}
+                  className={`form-input pl-10 ${
+                    nameError ? "border-red-500" : ""
+                  }`}
                   placeholder="Nhập họ tên của bạn"
                   value={formik.values.name}
                   onChange={(e) => {
                     // Only allow letters and spaces
-                    const value = e.target.value.replace(/[0-9]/g, "")
-                    formik.setFieldValue("name", value)
-                    validateName(value)
+                    const value = e.target.value.replace(/[0-9]/g, "");
+                    formik.setFieldValue("name", value);
+                    validateName(value);
                   }}
                   onBlur={() => validateName(formik.values.name)}
                 />
@@ -210,13 +260,15 @@ const RegisterPage = () => {
                   type="email"
                   id="email"
                   name="email"
-                  className={`form-input pl-10 ${emailError ? "border-red-500" : ""}`}
+                  className={`form-input pl-10 ${
+                    emailError ? "border-red-500" : ""
+                  }`}
                   placeholder="Nhập email của bạn"
                   value={formik.values.email}
                   onChange={(e) => {
-                    const value = e.target.value
-                    formik.setFieldValue("email", value)
-                    validateEmail(value)
+                    const value = e.target.value;
+                    formik.setFieldValue("email", value);
+                    validateEmail(value);
                   }}
                   onBlur={() => validateEmail(formik.values.email)}
                 />
@@ -236,16 +288,21 @@ const RegisterPage = () => {
                   type={showPassword ? "text" : "password"}
                   id="password"
                   name="password"
-                  className={`form-input pl-10 pr-10 ${passwordError ? "border-red-500" : ""}`}
+                  className={`form-input pl-10 pr-10 ${
+                    passwordError ? "border-red-500" : ""
+                  }`}
                   placeholder="Nhập mật khẩu của bạn"
                   value={formik.values.password}
                   onChange={(e) => {
-                    const value = e.target.value
-                    formik.setFieldValue("password", value)
-                    validatePassword(value)
+                    const value = e.target.value;
+                    formik.setFieldValue("password", value);
+                    validatePassword(value);
                     // Also validate confirm password if it has a value
                     if (formik.values.confirmPassword) {
-                      validateConfirmPassword(formik.values.confirmPassword, value)
+                      validateConfirmPassword(
+                        formik.values.confirmPassword,
+                        value
+                      );
                     }
                   }}
                   onBlur={() => validatePassword(formik.values.password)}
@@ -255,10 +312,16 @@ const RegisterPage = () => {
                   className="absolute inset-y-0 right-0 flex items-center pr-3"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? <FiEyeOff className="text-gray-dark" /> : <FiEye className="text-gray-dark" />}
+                  {showPassword ? (
+                    <FiEyeOff className="text-gray-dark" />
+                  ) : (
+                    <FiEye className="text-gray-dark" />
+                  )}
                 </button>
               </div>
-              {passwordError && <div className="form-error">{passwordError}</div>}
+              {passwordError && (
+                <div className="form-error">{passwordError}</div>
+              )}
             </div>
 
             <div className="mb-4">
@@ -273,25 +336,38 @@ const RegisterPage = () => {
                   type={showConfirmPassword ? "text" : "password"}
                   id="confirmPassword"
                   name="confirmPassword"
-                  className={`form-input pl-10 pr-10 ${confirmPasswordError ? "border-red-500" : ""}`}
+                  className={`form-input pl-10 pr-10 ${
+                    confirmPasswordError ? "border-red-500" : ""
+                  }`}
                   placeholder="Xác nhận mật khẩu của bạn"
                   value={formik.values.confirmPassword}
                   onChange={(e) => {
-                    const value = e.target.value
-                    formik.setFieldValue("confirmPassword", value)
-                    validateConfirmPassword(value, formik.values.password)
+                    const value = e.target.value;
+                    formik.setFieldValue("confirmPassword", value);
+                    validateConfirmPassword(value, formik.values.password);
                   }}
-                  onBlur={() => validateConfirmPassword(formik.values.confirmPassword, formik.values.password)}
+                  onBlur={() =>
+                    validateConfirmPassword(
+                      formik.values.confirmPassword,
+                      formik.values.password
+                    )
+                  }
                 />
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 flex items-center pr-3"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
-                  {showConfirmPassword ? <FiEyeOff className="text-gray-dark" /> : <FiEye className="text-gray-dark" />}
+                  {showConfirmPassword ? (
+                    <FiEyeOff className="text-gray-dark" />
+                  ) : (
+                    <FiEye className="text-gray-dark" />
+                  )}
                 </button>
               </div>
-              {confirmPasswordError && <div className="form-error">{confirmPasswordError}</div>}
+              {confirmPasswordError && (
+                <div className="form-error">{confirmPasswordError}</div>
+              )}
             </div>
 
             <div className="mb-4">
@@ -306,14 +382,16 @@ const RegisterPage = () => {
                   type="tel"
                   id="phone"
                   name="phone"
-                  className={`form-input pl-10 ${phoneError ? "border-red-500" : ""}`}
+                  className={`form-input pl-10 ${
+                    phoneError ? "border-red-500" : ""
+                  }`}
                   placeholder="Nhập số điện thoại của bạn"
                   value={formik.values.phone}
                   onChange={(e) => {
                     // Only allow numbers
-                    const value = e.target.value.replace(/\D/g, "")
-                    formik.setFieldValue("phone", value)
-                    validatePhone(value)
+                    const value = e.target.value.replace(/\D/g, "");
+                    formik.setFieldValue("phone", value);
+                    validatePhone(value);
                   }}
                   onBlur={() => validatePhone(formik.values.phone)}
                   maxLength={11}
@@ -330,7 +408,6 @@ const RegisterPage = () => {
             <button
               type="submit"
               className="btn btn-primary w-full flex items-center justify-center"
-              disabled={isLoading || !isCaptchaValid || isSubmitting}
             >
               {isLoading || isSubmitting ? <Spinner size="sm" /> : "Đăng ký"}
             </button>
@@ -339,7 +416,10 @@ const RegisterPage = () => {
           <div className="mt-6 text-center">
             <p className="text-gray-dark">
               Đã có tài khoản?{" "}
-              <Link to={redirect ? `/login?redirect=${redirect}` : "/login"} className="text-primary hover:underline">
+              <Link
+                to={redirect ? `/login?redirect=${redirect}` : "/login"}
+                className="text-primary hover:underline"
+              >
                 Đăng nhập
               </Link>
             </p>
@@ -357,7 +437,7 @@ const RegisterPage = () => {
         </div>
       )}
     </Layout>
-  )
-}
+  );
+};
 
-export default RegisterPage
+export default RegisterPage;
