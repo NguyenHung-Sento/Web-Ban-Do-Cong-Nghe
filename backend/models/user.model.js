@@ -63,6 +63,11 @@ const User = {
     return await bcrypt.compare(plainPassword, hashedPassword)
   },
 
+  updateRole: async (id, role) => {
+    const [result] = await db.query(`UPDATE users SET role = ? WHERE id = ?`, [role, id])
+    return result.affectedRows > 0
+  },
+
   // Link social account to existing user
   linkSocialAccount: async (userId, provider, socialId, profilePicture) => {
     const field = provider === "google" ? "google_id" : "facebook_id"

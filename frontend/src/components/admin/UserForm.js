@@ -1,43 +1,61 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import AdminService from "../../services/admin.service"
-import { toast } from "react-toastify"
+import { useState, useEffect } from "react";
+import AdminService from "../../services/admin.service";
+import { toast } from "react-toastify";
 
-const UserForm = ({ onSave, onCancel }) => {
+const UserForm = ({ user, onSave, onCancel }) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     phone: "",
     role: "user",
-  })
+  });
 
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || "",
+        email: user.email || "",
+        password: user.password || "",
+        phone: user.phone || "",
+        role: user.role || "user",
+      });
+    }
+  }, [user]);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }))
-  }
+    }));
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
 
     try {
-      await AdminService.createUser(formData)
-      toast.success("Thêm người dùng thành công")
-      onSave()
+      const submitData = { ...formData }
+      if(user){
+        await AdminService.updateRoleUser(user.id, submitData);
+        toast.success("Cập nhật người dùng thành công")
+      } else {
+        await AdminService.createUser(submitData);
+        toast.success("Thêm người dùng thành công");
+      }
+      onSave();
     } catch (error) {
-      console.error("Error creating user:", error)
-      toast.error("Không thể thêm người dùng")
+      console.error("Error creating user:", error);
+      toast.error("Không thể thêm người dùng");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -45,15 +63,20 @@ const UserForm = ({ onSave, onCancel }) => {
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-semibold">Thêm người dùng mới</h2>
-            <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">
+            <button
+              onClick={onCancel}
+              className="text-gray-500 hover:text-gray-700"
+            >
               ✕
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Tên */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Họ và tên *</label>
+            {!user && <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Họ và tên *
+              </label>
               <input
                 type="text"
                 name="name"
@@ -62,11 +85,13 @@ const UserForm = ({ onSave, onCancel }) => {
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
-            </div>
+            </div>}
 
             {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+             {!user && <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email *
+              </label>
               <input
                 type="email"
                 name="email"
@@ -75,11 +100,13 @@ const UserForm = ({ onSave, onCancel }) => {
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
-            </div>
+            </div>}
 
             {/* Mật khẩu */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Mật khẩu *</label>
+             {!user && <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Mật khẩu *
+              </label>
               <input
                 type="password"
                 name="password"
@@ -89,23 +116,28 @@ const UserForm = ({ onSave, onCancel }) => {
                 minLength="6"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
-            </div>
+            </div>}
 
             {/* Số điện thoại */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại</label>
+             {!user && <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Số điện thoại *
+              </label>
               <input
                 type="tel"
                 name="phone"
                 value={formData.phone}
                 onChange={handleInputChange}
+                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
-            </div>
+            </div>}
 
             {/* Vai trò */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Vai trò</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Vai trò
+              </label>
               <select
                 name="role"
                 value={formData.role}
@@ -131,14 +163,14 @@ const UserForm = ({ onSave, onCancel }) => {
                 disabled={isLoading}
                 className="px-6 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50"
               >
-                {isLoading ? "Đang lưu..." : "Thêm mới"}
+                {isLoading ? "Đang lưu..." : user ? "Cập nhật" : "Thêm mới"}
               </button>
             </div>
           </form>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default UserForm
+export default UserForm;

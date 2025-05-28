@@ -14,19 +14,26 @@ const UsersPage = () => {
   const [roleFilter, setRoleFilter] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [showForm, setShowForm] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const itemsPerPage = 10
+  const [isEditingUser, setIsEdtingUser] = useState(null)
+
 
   const fetchUsers = async () => {
     try {
       setIsLoading(true)
-      const params = {}
+      const params = {
+        page: currentPage,
+        limit: itemsPerPage,
+      }
       if (searchTerm) params.search = searchTerm
       if (roleFilter) params.role = roleFilter
 
       const response = await AdminService.getUsers(params)
       if (response && response.data && response.data.data) {
         setUsers(response.data.data.users || [])
-      } else {
-        setUsers([])
+        setTotalItems(response.data.data.total || response.data.data.pagination?.total || 0)
       }
       setIsLoading(false)
     } catch (error) {
@@ -38,25 +45,38 @@ const UsersPage = () => {
 
   useEffect(() => {
     fetchUsers()
-  }, [])
+  }, [currentPage])
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
+      setCurrentPage(1)
       fetchUsers()
     }, 1000)
     return () => clearTimeout(delayDebounceFn)
   }, [searchTerm, roleFilter])
 
+  const handlePageChange = (page) => {
+    setCurrentPage(page)
+  }
+
   const handleAddUser = () => {
+    setIsEdtingUser(null)
+    setShowForm(true)
+  }
+
+  const handleEditUser = (user) => {
+    setIsEdtingUser(user)
     setShowForm(true)
   }
 
   const handleFormSave = () => {
+    setIsEdtingUser(null)
     setShowForm(false)
     fetchUsers()
   }
 
   const handleFormCancel = () => {
+    setIsEdtingUser(null)
     setShowForm(false)
   }
 
@@ -121,17 +141,6 @@ const UsersPage = () => {
       accessor: "created_at",
       render: (item) => new Date(item.created_at).toLocaleDateString("vi-VN"),
     },
-    {
-      header: "Hành động",
-      accessor: "actions",
-      render: (item) => (
-        <div className="flex space-x-2">
-          <button onClick={() => handleDeleteUser(item)} className="text-red-600 hover:text-red-800">
-            Xóa
-          </button>
-        </div>
-      ),
-    },
   ]
 
   return (
@@ -186,9 +195,18 @@ const UsersPage = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       ) : (
-        <DataTable columns={userColumns} data={users} itemsPerPage={10} />
+        <DataTable
+        columns={userColumns}
+        data={users}
+        onEdit={handleEditUser}
+        onDelete={handleDeleteUser}
+        totalItems={totalItems}
+        currentPage={currentPage}
+        onPageChange={handlePageChange}
+        itemsPerPage={itemsPerPage}
+      />
       )}
-      {showForm && <UserForm onSave={handleFormSave} onCancel={handleFormCancel} />}
+      {showForm && <UserForm user={isEditingUser} onSave={handleFormSave} onCancel={handleFormCancel}/>}
     </AdminLayout>
   )
 }

@@ -59,7 +59,7 @@ const ProductsPage = () => {
     const delayDebounceFn = setTimeout(() => {
       setCurrentPage(1) // Reset to first page when searching
       fetchProducts()
-    }, 1000)
+    }, 500)
     return () => clearTimeout(delayDebounceFn)
   }, [searchTerm, categoryFilter, statusFilter])
 

@@ -12,7 +12,7 @@ const BannerForm = ({ banner, onSubmit, onCancel, isLoading }) => {
     image_url: "",
     link_url: "",
     button_text: "",
-    position: 0,
+    position: 1,
     is_active: true,
   })
 
@@ -181,7 +181,7 @@ const BannerForm = ({ banner, onSubmit, onCancel, isLoading }) => {
             {/* Link URL */}
             <div>
               <label htmlFor="link_url" className="block text-sm font-medium text-gray-700 mb-2">
-                Đường dẫn
+                Đường dẫn gắn với banner
               </label>
               <input
                 type="text"
@@ -197,7 +197,7 @@ const BannerForm = ({ banner, onSubmit, onCancel, isLoading }) => {
             {/* Button Text */}
             <div>
               <label htmlFor="button_text" className="block text-sm font-medium text-gray-700 mb-2">
-                Văn bản nút
+                Văn bản nút *
               </label>
               <input
                 type="text"
@@ -205,6 +205,7 @@ const BannerForm = ({ banner, onSubmit, onCancel, isLoading }) => {
                 name="button_text"
                 value={formData.button_text}
                 onChange={handleInputChange}
+                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 placeholder="Xem chi tiết"
               />
@@ -222,7 +223,7 @@ const BannerForm = ({ banner, onSubmit, onCancel, isLoading }) => {
                   name="position"
                   value={formData.position}
                   onChange={handleInputChange}
-                  min="0"
+                  min="1"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>

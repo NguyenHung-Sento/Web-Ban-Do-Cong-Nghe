@@ -12,6 +12,16 @@ CREATE TABLE IF NOT EXISTS `cellphones_db`.`users` (
   `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE INDEX `email` (`email` ASC) VISIBLE);
+
+CREATE TABLE IF NOT EXISTS `cellphones_db`.`categories` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(100) NOT NULL,
+  `slug` VARCHAR(100) NOT NULL,
+  `image` VARCHAR(255) NULL DEFAULT NULL COMMENT 'URL hình ảnh từ Cloudinary',
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `slug` (`slug` ASC) VISIBLE);
   
 CREATE TABLE IF NOT EXISTS `cellphones_db`.`products` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -40,16 +50,6 @@ CREATE TABLE IF NOT EXISTS `cellphones_db`.`products` (
     FOREIGN KEY (`category_id`)
     REFERENCES `cellphones_db`.`categories` (`id`)
     ON DELETE SET NULL);
-    
-CREATE TABLE IF NOT EXISTS `cellphones_db`.`categories` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `name` VARCHAR(100) NOT NULL,
-  `slug` VARCHAR(100) NOT NULL,
-  `image` VARCHAR(255) NULL DEFAULT NULL COMMENT 'URL hình ảnh từ Cloudinary',
-  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE INDEX `slug` (`slug` ASC) VISIBLE);
   
 CREATE TABLE IF NOT EXISTS `cellphones_db`.`orders` (
   `id` INT NOT NULL AUTO_INCREMENT,

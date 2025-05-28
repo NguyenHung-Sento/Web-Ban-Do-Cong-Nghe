@@ -18,7 +18,7 @@ const SimpleChart = ({ title, data }) => {
     ctx.clearRect(0, 0, width, height)
 
     // Chart dimensions
-    const padding = 60
+    const padding = 80
     const chartWidth = width - 2 * padding
     const chartHeight = height - 2 * padding
 

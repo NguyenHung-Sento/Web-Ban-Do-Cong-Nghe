@@ -208,7 +208,7 @@ const ProductForm = ({ product, onSave, onCancel }) => {
           return
         }
       } else {
-        submitData.specifications = ""
+        submitData.specifications = "{}"
       }
 
       if (submitData.variants && submitData.variants.trim()) {
@@ -220,7 +220,7 @@ const ProductForm = ({ product, onSave, onCancel }) => {
           return
         }
       } else {
-        submitData.variants = ""
+        submitData.variants = "{}"
       }
 
       // Handle images field
@@ -236,7 +236,7 @@ const ProductForm = ({ product, onSave, onCancel }) => {
         }
         // If it's comma-separated, let backend handle it
       } else {
-        submitData.images = ""
+        submitData.images = "[]"
       }
 
       if (product) {
@@ -316,12 +316,13 @@ const ProductForm = ({ product, onSave, onCancel }) => {
 
               {/* Thương hiệu */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Thương hiệu</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Thương hiệu *</label>
                 <input
                   type="text"
                   name="brand"
                   value={formData.brand}
                   onChange={handleInputChange}
+                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -342,26 +343,28 @@ const ProductForm = ({ product, onSave, onCancel }) => {
 
               {/* Giá khuyến mãi */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Giá khuyến mãi</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Giá khuyến mãi *</label>
                 <input
                   type="number"
                   name="sale_price"
                   value={formData.sale_price}
                   onChange={handleInputChange}
                   min="0"
+                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
               {/* Tồn kho */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tồn kho</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tồn kho *</label>
                 <input
                   type="number"
                   name="stock"
                   value={formData.stock}
                   onChange={handleInputChange}
                   min="0"
+                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -383,13 +386,14 @@ const ProductForm = ({ product, onSave, onCancel }) => {
 
               {/* Hình ảnh chính */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh chính</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hình ảnh chính *</label>
                 <input
                   type="url"
                   name="image"
                   value={formData.image}
                   onChange={handleInputChange}
                   placeholder="https://example.com/image.jpg"
+                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 {formData.image && (

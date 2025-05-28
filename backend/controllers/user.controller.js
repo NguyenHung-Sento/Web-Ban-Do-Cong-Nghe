@@ -86,7 +86,7 @@ exports.getUserById = async (req, res, next) => {
 // Tạo người dùng mới (chỉ admin)
 exports.createUser = async (req, res, next) => {
   try {
-    const { name, email, password, phone, address, role } = req.body
+    const { name, email, password, phone, role } = req.body
 
     // Kiểm tra xem người dùng đã tồn tại chưa
     const existingUser = await User.findByEmail(email)
@@ -103,7 +103,6 @@ exports.createUser = async (req, res, next) => {
       email,
       password,
       phone,
-      address,
       role: role || "user",
     })
 
@@ -119,10 +118,18 @@ exports.createUser = async (req, res, next) => {
   }
 }
 
-// Cập nhật người dùng (chỉ admin)
-exports.updateUser = async (req, res, next) => {
+// Cập nhật phân quyền người dùng (chỉ admin)
+exports.updateRoleUser = async (req, res, next) => {
   try {
-    const success = await User.update(req.params.id, req.body)
+    const { role } = req.body
+
+    if (!["user", "admin"].includes(role)) {
+      return res.status(400).json({
+        status: "error",
+        message: "Trạng thái phân quyền không hợp lệ",
+      })
+    }
+    const success = await User.updateRole(req.params.id, role)
 
     if (!success) {
       return res.status(404).json({

@@ -105,7 +105,7 @@ class AdminService {
     return api.post("/users", userData)
   }
 
-  updateUser(id, userData) {
+  updateRoleUser(id, userData) {
     return api.put(`/users/${id}`, userData)
   }
 

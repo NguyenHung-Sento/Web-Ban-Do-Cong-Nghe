@@ -38,13 +38,17 @@ const CategoriesPage = () => {
       setIsLoading(false)
     }
   }
-
+  useEffect(() => {
+    fetchCategories()
+  }, [currentPage])
+  
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
+      setCurrentPage(1)
       fetchCategories()
-    }, 1000)
+    }, 500)
     return () => clearTimeout(delayDebounceFn)
-  }, [currentPage, searchTerm])
+  }, [searchTerm])
 
   const handlePageChange = (page) => {
     setCurrentPage(page)

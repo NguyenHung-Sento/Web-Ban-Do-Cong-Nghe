@@ -1,5 +1,13 @@
 USE cellphones_db;
 
+-- Tạo dữ liệu mẫu cho danh mục
+INSERT INTO categories (name, slug, image) VALUES
+('Điện thoại', 'dien-thoai', 'category-smartphones.jpg'),
+('Máy tính bảng', 'may-tinh-bang', 'category-tablets.jpg'),
+('Laptop', 'laptop', 'category-laptops.jpg'),
+('Phụ kiện', 'phu-kien', 'category-accessories.jpg'),
+('Đồng hồ thông minh', 'dong-ho-thong-minh', 'category-smartwatches.jpg');
+
 INSERT INTO products (name, slug, description, price, sale_price, stock, category_id, brand, image, specifications, featured, status) VALUES
       ('iPhone 13 Pro', 'iphone-13-pro', 'iPhone mới nhất với hệ thống camera chuyên nghiệp', 29990000, 28990000, 50, 1, 'Apple', 'iphone-13-pro.jpg', '{"display":"6.1-inch","processor":"A15 Bionic","camera":"12MP"}', 1, 'active'),
       ('Samsung Galaxy S21', 'samsung-galaxy-s21', 'Điện thoại flagship của Samsung', 19990000, 18990000, 30, 1, 'Samsung', 'samsung-s21.jpg', '{"display":"6.2-inch","processor":"Exynos 2100","camera":"64MP"}', 1, 'active'),
@@ -140,13 +148,6 @@ INSERT INTO bank_accounts (bank_name, account_number, account_holder, bank_branc
 ('BIDV', '1122334455', 'CÔNG TY CỔ PHẦN DIGITALW', 'Chi nhánh Đà Nẵng', 'bidv_qr.png'),
 ('MB Bank', '5566778899', 'CÔNG TY CỔ PHẦN DIGITALW', 'Chi nhánh Cần Thơ', 'mbbank_qr.png');
 
--- Tạo dữ liệu mẫu cho danh mục
-INSERT INTO categories (name, slug, image) VALUES
-('Điện thoại', 'dien-thoai', 'category-smartphones.jpg'),
-('Máy tính bảng', 'may-tinh-bang', 'category-tablets.jpg'),
-('Laptop', 'laptop', 'category-laptops.jpg'),
-('Phụ kiện', 'phu-kien', 'category-accessories.jpg'),
-('Đồng hồ thông minh', 'dong-ho-thong-minh', 'category-smartwatches.jpg');
 
 -- Tạo tài khoản admin mặc định (password: admin123)
 INSERT INTO users (name, email, password, role) VALUES
