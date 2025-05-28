@@ -146,7 +146,7 @@ const OrderDetailPage = () => {
                   <img
                     src={item.product_image || "/placeholder.svg?height=60&width=60"}
                     alt={item.product_name}
-                    className="w-15 h-15 object-cover rounded-md mr-4"
+                    className="w-14 h-14 object-cover rounded-md mr-4"
                   />
                   <div className="flex-1">
                     <h3 className="font-medium">{item.product_name}</h3>

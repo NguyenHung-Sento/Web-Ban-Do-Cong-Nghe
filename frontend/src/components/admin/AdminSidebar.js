@@ -7,8 +7,11 @@ import { FiHome, FiBox, FiTag, FiShoppingBag, FiUsers, FiX, FiImage } from "reac
 const AdminSidebar = forwardRef(({ isOpen, toggleSidebar }, ref) => {
   const location = useLocation()
 
-  const isActive = (path) => {
-    return location.pathname === path || location.pathname.startsWith(`${path}/`)
+   const isActive = (path) => {
+    if (path === "/admin") {
+      return location.pathname === "/admin"
+    }
+    return location.pathname.startsWith(path)
   }
 
   const menuItems = [
