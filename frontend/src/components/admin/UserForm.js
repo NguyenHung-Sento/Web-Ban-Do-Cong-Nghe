@@ -40,10 +40,10 @@ const UserForm = ({ user, onSave, onCancel }) => {
     setIsLoading(true);
 
     try {
-      const submitData = { ...formData }
-      if(user){
+      const submitData = { ...formData };
+      if (user) {
         await AdminService.updateRoleUser(user.id, submitData);
-        toast.success("Cập nhật người dùng thành công")
+        toast.success("Cập nhật người dùng thành công");
       } else {
         await AdminService.createUser(submitData);
         toast.success("Thêm người dùng thành công");
@@ -62,7 +62,9 @@ const UserForm = ({ user, onSave, onCancel }) => {
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold">Thêm người dùng mới</h2>
+            <h2 className="text-2xl font-semibold">
+              {user ? "Cập nhật phân quyền" : "Thêm người dùng mới"}
+            </h2>
             <button
               onClick={onCancel}
               className="text-gray-500 hover:text-gray-700"
@@ -73,7 +75,7 @@ const UserForm = ({ user, onSave, onCancel }) => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Tên */}
-            {!user && <div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Họ và tên *
               </label>
@@ -83,12 +85,13 @@ const UserForm = ({ user, onSave, onCancel }) => {
                 value={formData.name}
                 onChange={handleInputChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={!!user}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-gray-200 cursor-not-allowed"
               />
-            </div>}
+            </div>
 
             {/* Email */}
-             {!user && <div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email *
               </label>
@@ -98,40 +101,45 @@ const UserForm = ({ user, onSave, onCancel }) => {
                 value={formData.email}
                 onChange={handleInputChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                disabled={!!user} // Chỉ disable khi có user
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-gray-200 cursor-not-allowed"
               />
-            </div>}
+            </div>
 
             {/* Mật khẩu */}
-             {!user && <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mật khẩu *
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                required
-                minLength="6"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>}
+            {!user && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mật khẩu *
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required
+                  minLength="6"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            )}
 
             {/* Số điện thoại */}
-             {!user && <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Số điện thoại *
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>}
+            {!user && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Số điện thoại *
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+            )}
 
             {/* Vai trò */}
             <div>
